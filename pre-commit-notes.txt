@@ -1,0 +1,29 @@
+# 1. Remove trailing whitespaces Passed
+pre-commit run trailing-whitespace --all-files
+
+# 2. Fix end of file (newline at EOF) Passed
+pre-commit run end-of-file-fixer --all-files
+
+# 3. Check YAML files Passed
+pre-commit run check-yaml --all-files
+
+# 4. Check for large added files Passed
+pre-commit run check-added-large-files --all-files
+
+# 5. Format with Black Passed
+pre-commit run black --all-files
+
+# 6. Sort imports using isort Passed
+pre-commit run isort --all-files
+
+# 7. Lint with flake8 Passed
+pre-commit run flake8 --all-files
+
+# 8. Lint with pylint Failed
+pre-commit run pylint --all-files
+
+# 9. Type check with mypy Failed
+pre-commit run mypy --all-files
+
+# 10. Security scan with bandit Passed
+pre-commit run bandit --all-files
