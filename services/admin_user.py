@@ -10,7 +10,6 @@ from starlette.responses import JSONResponse
 from core.api_response import api_response
 from db.models.superadmin import AdminUser, Config, Role
 
-
 async def get_admin_user_analytics(
     db: AsyncSession,
 ) -> Row[Tuple[int, Any, Any, Any, Any, Any, Any, datetime, datetime]]:
@@ -71,17 +70,16 @@ async def get_daily_registrations(
 
 
 async def validate_unique_user(
-    db: AsyncSession, username: str, email: str
+    db: AsyncSession, email_hash: str
 ) -> JSONResponse | None:
     user_query = await db.execute(
-        select(AdminUser).where(
-            (AdminUser.username == username) | (AdminUser.email == email)
-        )
+        select(AdminUser).where(AdminUser.email_hash == email_hash)
+        
     )
     if user_query.scalar_one_or_none():
         return api_response(
             status_code=status.HTTP_409_CONFLICT,
-            message="Username or Email already exists.",
+            message="User with the given email already exists.",
             log_error=True,
         )
     return None
@@ -103,6 +101,8 @@ async def validate_role(db: AsyncSession, role_id: str) -> JSONResponse | Role:
             log_error=True,
         )
     return role
+
+
 
 
 async def validate_superadmin_uniqueness(
@@ -142,3 +142,35 @@ async def get_config_or_404(
             log_error=True,
         )
     return config
+
+
+async def get_user_by_id(
+    db: AsyncSession, user_id: str
+) -> JSONResponse | AdminUser:
+    """Find a user by ID and return either the user or an error response"""
+    result = await db.execute(
+        select(AdminUser).where(AdminUser.user_id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="User not found.",
+            log_error=True,
+        )
+    return user
+
+
+async def get_user_by_email(
+    db: AsyncSession, email: str
+) -> JSONResponse | AdminUser:
+    """Find a user by email and return either the user or an error response"""
+    result = await db.execute(select(AdminUser).where(AdminUser.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="User not found.",
+            log_error=True,
+        )
+    return user

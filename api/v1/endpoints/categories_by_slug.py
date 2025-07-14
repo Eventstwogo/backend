@@ -31,23 +31,279 @@ from utils.validators import normalize_whitespace
 
 router = APIRouter()
 
+# import time
+# from fastapi.responses import JSONResponse
+# @router.get("/slug/{slug}")
+# @exception_handler
+# async def get_category_by_slug(
+#     slug: str, db: AsyncSession = Depends(get_db)
+# ) -> JSONResponse:
+#     api_start_time = time.perf_counter()
+
+#     # Start DB + ORM timing
+#     db_start_time = time.perf_counter()
+
+#     # Step 1: Execute query
+#     q_start = time.perf_counter()
+#     result = await db.execute(
+#         select(Category)
+#         .options(selectinload(Category.subcategories))
+#         .filter_by(category_slug=slug)
+#     )
+#     q_end = time.perf_counter()
+
+#     # Step 2: Hydrate ORM objects
+#     category = result.scalars().first()
+#     orm_end = time.perf_counter()
+
+#     db_execute_ms = (q_end - q_start) * 1000
+#     db_hydration_ms = (orm_end - q_end) * 1000
+#     db_total_ms = (orm_end - db_start_time) * 1000
+
+#     # If category not found
+#     if not category:
+#         response = api_response(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             message="Category not found",
+#         )
+#         api_duration_ms = (time.perf_counter() - api_start_time) * 1000
+#         response.headers["x-api-time-ms"] = f"{api_duration_ms:.3f}"
+#         response.headers["x-db-total-ms"] = f"{db_total_ms:.3f}"
+#         response.headers["x-db-execute-ms"] = f"{db_execute_ms:.3f}"
+#         response.headers["x-db-hydration-ms"] = f"{db_hydration_ms:.3f}"
+#         return response
+
+#     # Prepare response data
+#     data = {
+#         "category_id": category.category_id,
+#         "category_name": category.category_name.title(),
+#         "category_description": category.category_description,
+#         "category_slug": category.category_slug,
+#         "category_meta_title": category.category_meta_title,
+#         "category_meta_description": category.category_meta_description,
+#         "category_img_thumbnail": get_media_url(category.category_img_thumbnail),
+#         "featured_category": category.featured_category,
+#         "show_in_menu": category.show_in_menu,
+#         "category_status": category.category_status,
+#         "category_tstamp": (
+#             cast(datetime, category.category_tstamp).isoformat()
+#             if category.category_tstamp else None
+#         ),
+#         "subcategories": [
+#             {
+#                 "subcategory_id": sub.subcategory_id,
+#                 "subcategory_name": sub.subcategory_name.title(),
+#                 "subcategory_description": sub.subcategory_description,
+#                 "subcategory_slug": sub.subcategory_slug,
+#                 "subcategory_meta_title": sub.subcategory_meta_title,
+#                 "subcategory_meta_description": sub.subcategory_meta_description,
+#                 "subcategory_img_thumbnail": get_media_url(sub.subcategory_img_thumbnail),
+#                 "featured_subcategory": sub.featured_subcategory,
+#                 "show_in_menu": sub.show_in_menu,
+#                 "subcategory_status": sub.subcategory_status,
+#                 "subcategory_tstamp": (
+#                     cast(datetime, sub.subcategory_tstamp).isoformat()
+#                     if sub.subcategory_tstamp else None
+#                 ),
+#             }
+#             for sub in category.subcategories
+#         ],
+#     }
+
+#     # Return response with timing headers
+#     response = api_response(
+#         status_code=status.HTTP_200_OK,
+#         message="Category fetched successfully",
+#         data=data,
+#     )
+
+#     api_duration_ms = (time.perf_counter() - api_start_time) * 1000
+
+#     response.headers["x-api-time-ms"] = f"{api_duration_ms:.3f}"
+#     response.headers["x-db-total-ms"] = f"{db_total_ms:.3f}"
+#     response.headers["x-db-execute-ms"] = f"{db_execute_ms:.3f}"
+#     response.headers["x-db-hydration-ms"] = f"{db_hydration_ms:.8f}"
+
+#     return response
+
+# @router.get("/slug/{slug}")
+# @exception_handler
+# async def get_category_by_slug(
+#     slug: str, db: AsyncSession = Depends(get_db)
+# ) -> JSONResponse:
+#     result = await db.execute(
+#         select(Category)
+#         .options(selectinload(Category.subcategories))
+#         .filter_by(category_slug=slug)
+#     )
+#     category = result.scalars().first()
+
+#     if not category:
+#         return api_response(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             message="Category not found",
+#         )
+
+#     data = {
+#         "category_id": category.category_id,
+#         "category_name": category.category_name.title(),
+#         "category_description": category.category_description,
+#         "category_slug": category.category_slug,
+#         "category_meta_title": category.category_meta_title,
+#         "category_meta_description": category.category_meta_description,
+#         "category_img_thumbnail": get_media_url(
+#             category.category_img_thumbnail
+#         ),
+#         "featured_category": category.featured_category,
+#         "show_in_menu": category.show_in_menu,
+#         "category_status": category.category_status,
+#         "category_tstamp": (
+#             cast(datetime, category.category_tstamp).isoformat()
+#             if category.category_tstamp
+#             else None
+#         ),
+#         "subcategories": [
+#             {
+#                 "subcategory_id": sub.subcategory_id,
+#                 "subcategory_name": sub.subcategory_name.title(),
+#                 "subcategory_description": (sub.subcategory_description),
+#                 "subcategory_slug": sub.subcategory_slug,
+#                 "subcategory_meta_title": sub.subcategory_meta_title,
+#                 "subcategory_meta_description": (
+#                     sub.subcategory_meta_description
+#                 ),
+#                 "subcategory_img_thumbnail": get_media_url(
+#                     sub.subcategory_img_thumbnail
+#                 ),
+#                 "featured_subcategory": sub.featured_subcategory,
+#                 "show_in_menu": sub.show_in_menu,
+#                 "subcategory_status": sub.subcategory_status,
+#                 "subcategory_tstamp": (
+#                     cast(datetime, sub.subcategory_tstamp).isoformat()
+#                     if sub.subcategory_tstamp
+#                     else None
+#                 ),
+#             }
+#             for sub in category.subcategories
+#         ],
+#     }
+
+#     return api_response(
+#         status_code=status.HTTP_200_OK,
+#         message="Category fetched successfully",
+#         data=data,
+#     )
+
+# import time
+# @router.get("/slug/{slug}")
+# @exception_handler
+# async def get_category_by_slug(
+#     slug: str,
+#     db: AsyncSession = Depends(get_db)
+# ) -> JSONResponse:
+#     # ⏱ Start DB timer
+#     db_start = time.perf_counter()
+
+#     result = await db.execute(
+#         select(Category)
+#         .options(selectinload(Category.subcategories))
+#         .filter_by(category_slug=slug)
+#     )
+#     category = result.scalars().first()
+
+#     # ⏱ End DB timer
+#     db_end = time.perf_counter()
+#     db_time = round(db_end - db_start, 4)  # in seconds
+
+#     if not category:
+#         return api_response(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             message="Category not found",
+#             data={"db_time": db_time}
+#         )
+
+#     data = {
+#         "category_id": category.category_id,
+#         "category_name": category.category_name.title(),
+#         "category_description": category.category_description,
+#         "category_slug": category.category_slug,
+#         "category_meta_title": category.category_meta_title,
+#         "category_meta_description": category.category_meta_description,
+#         "category_img_thumbnail": get_media_url(
+#             category.category_img_thumbnail
+#         ),
+#         "featured_category": category.featured_category,
+#         "show_in_menu": category.show_in_menu,
+#         "category_status": category.category_status,
+#         "category_tstamp": (
+#             cast(datetime, category.category_tstamp).isoformat()
+#             if category.category_tstamp
+#             else None
+#         ),
+#         "subcategories": [
+#             {
+#                 "subcategory_id": sub.subcategory_id,
+#                 "subcategory_name": sub.subcategory_name.title(),
+#                 "subcategory_description": (sub.subcategory_description),
+#                 "subcategory_slug": sub.subcategory_slug,
+#                 "subcategory_meta_title": sub.subcategory_meta_title,
+#                 "subcategory_meta_description": (
+#                     sub.subcategory_meta_description
+#                 ),
+#                 "subcategory_img_thumbnail": get_media_url(
+#                     sub.subcategory_img_thumbnail
+#                 ),
+#                 "featured_subcategory": sub.featured_subcategory,
+#                 "show_in_menu": sub.show_in_menu,
+#                 "subcategory_status": sub.subcategory_status,
+#                 "subcategory_tstamp": (
+#                     cast(datetime, sub.subcategory_tstamp).isoformat()
+#                     if sub.subcategory_tstamp
+#                     else None
+#                 ),
+#             }
+#             for sub in category.subcategories
+#         ],
+#     }
+
+#     return api_response(
+#         status_code=status.HTTP_200_OK,
+#         message="Category fetched successfully",
+#         data={
+#             **data,
+#             "db_time": db_time  # ⏱ add DB execution time to response
+#         },
+#     )
+
+import time
 
 @router.get("/slug/{slug}")
 @exception_handler
 async def get_category_by_slug(
-    slug: str, db: AsyncSession = Depends(get_db)
+    slug: str,
+    db: AsyncSession = Depends(get_db)
 ) -> JSONResponse:
+    # ⏱ Start timer (full DB-visible operation)
+    start = time.perf_counter()
+
     result = await db.execute(
         select(Category)
         .options(selectinload(Category.subcategories))
         .filter_by(category_slug=slug)
     )
-    category = result.scalars().first()
+    
+    # Force full fetch and ORM hydration (like pgAdmin)
+    category = result.scalars().first()  # full fetch of first row & relationships
+
+    # ⏱ End timer after ORM access
+    end = time.perf_counter()
+    db_time = round(end - start, 4)  # seconds
 
     if not category:
         return api_response(
             status_code=status.HTTP_404_NOT_FOUND,
             message="Category not found",
+            data={"db_time": db_time}
         )
 
     data = {
@@ -72,12 +328,10 @@ async def get_category_by_slug(
             {
                 "subcategory_id": sub.subcategory_id,
                 "subcategory_name": sub.subcategory_name.title(),
-                "subcategory_description": (sub.subcategory_description),
+                "subcategory_description": sub.subcategory_description,
                 "subcategory_slug": sub.subcategory_slug,
                 "subcategory_meta_title": sub.subcategory_meta_title,
-                "subcategory_meta_description": (
-                    sub.subcategory_meta_description
-                ),
+                "subcategory_meta_description": sub.subcategory_meta_description,
                 "subcategory_img_thumbnail": get_media_url(
                     sub.subcategory_img_thumbnail
                 ),
@@ -97,9 +351,11 @@ async def get_category_by_slug(
     return api_response(
         status_code=status.HTTP_200_OK,
         message="Category fetched successfully",
-        data=data,
+        data={
+            **data,
+            "db_time": db_time  # 🕐 Show real query duration
+        },
     )
-
 
 @router.put("/update/by-slug/{category_slug}")
 @exception_handler

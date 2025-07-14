@@ -14,11 +14,14 @@ from api.v1.endpoints import (
 )
 
 
+from api.v1.endpoints.vendor import vendor_signup, email_verification, business_profile
+from api.v1.endpoints.admin import registration, admin_login, password_manager
+
 api_router = APIRouter(prefix="/api/v1")
 
 
 # KYC Endpoints
-api_router.include_router(abn_check.router, prefix="/abn_check", tags=["ABN"])
+# api_router.include_router(abn_check.router, prefix="/abn_check", tags=["ABN"])
 
 
 # Role Endpoints
@@ -61,4 +64,30 @@ api_router.include_router(
 # Configuration Endpoints
 api_router.include_router(
     config.router, prefix="/config", tags=["Configuration"]
+)
+
+
+#Vendor Endpoints
+
+api_router.include_router(
+    vendor_signup.router, prefix="/vendor", tags=["Vendor"]
+)
+
+api_router.include_router(
+    email_verification.router, prefix="/vendor", tags=["Vendor"]
+)
+
+api_router.include_router(
+    business_profile.router, prefix="/vendor", tags=["Vendor"]
+)
+
+# Admin User Endpoints
+api_router.include_router(
+    registration.router, prefix="/admin-users", tags=["Admin Users Registration"]
+)
+api_router.include_router(
+    admin_login.router, prefix="/admin-login", tags=["Admin Users Authentication"]
+)
+api_router.include_router(
+    password_manager.router, prefix="/admin", tags= ["Admin Password Management"]
 )

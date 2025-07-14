@@ -99,7 +99,6 @@ class AdminRegisterResponse(BaseModel):
     user_id: str
     email: EmailStr
     username: str
-    password: str
 
 
 class AdminUser(BaseModel):
@@ -144,24 +143,3 @@ class PaginatedAdminListResponse(BaseModel):
     page: int
     per_page: int
     admins: List[AdminUser]
-
-
-class AdminLoginRequest(BaseModel):
-    email: str = Field(..., description="Username or email (case-insensitive)")
-    password: str = Field(..., description="User password")
-
-
-class AdminLoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    message: str
-
-
-
-
-class UpdatePasswordBody(BaseModel):
-    old_password: str
-    new_password: str = Field(min_length=8)
-
-class UpdatePasswordResponse(BaseModel):
-    message: str    

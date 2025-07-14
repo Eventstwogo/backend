@@ -1,7 +1,10 @@
+import base64
+import os
 import random
 import secrets
 import string
-
+import hashlib
+from cryptography.fernet import Fernet
 from typing_extensions import LiteralString
 
 ## for snos 
@@ -93,3 +96,28 @@ def random_token():
     # Combine the parts with hyphens in the specified format
     authtoken = '-'.join(parts)
     return authtoken
+
+
+def generate_key():
+    return base64.urlsafe_b64encode(os.urandom(32))
+
+# Use a fixed key loaded from a secure config (env or secrets manager)
+FERNET_KEY = b'8BbYSaA8lXlzLl2y4tM0N18xWANoYsKhwxdSJaX9iZU='
+fernet = Fernet(FERNET_KEY)
+
+
+def encrypt_data(data: str) -> str:
+    return fernet.encrypt(data.encode()).decode()
+
+def decrypt_data(token: str) -> str:
+    return fernet.decrypt(token.encode()).decode()
+
+def hash_data(data: str) -> str:
+    return hashlib.sha256(data.encode()).hexdigest()
+
+
+def encrypt_dict_values(data: dict) -> dict:
+    return {key: encrypt_data(value) for key, value in data.items()}
+
+def decrypt_dict_values(data: dict) -> dict:
+    return {key: decrypt_data(value) for key, value in data.items()}

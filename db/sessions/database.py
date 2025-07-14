@@ -19,6 +19,9 @@ from tenacity import (
 from core.config import settings
 from db.models.base import Base
 
+
+from utils.db_timer import attach_query_timer 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger: Logger = logging.getLogger(__name__)
@@ -37,6 +40,8 @@ engine: AsyncEngine = create_async_engine(
     isolation_level="READ COMMITTED",  # Default isolation level
     future=True,  # Enable asyncio support
 )
+
+attach_query_timer(engine)
 
 # Create async session factory
 AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(

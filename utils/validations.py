@@ -1,5 +1,7 @@
 
 import re
+import secrets
+import string
 
 from fastapi import HTTPException
 
@@ -20,3 +22,8 @@ def validate_name(input_name: str, field_name: str) -> str:
     if not re.match(r'^[A-Za-z0-9\s!@#$%^&*(),.?":{}|<>_-]+$', cleaned_name):
         raise HTTPException(status_code=400, detail=f"{field_name} should contain only letters, digits and special characters.")
     return cleaned_name
+
+
+def generate_random_password(length: int = 12) -> str:
+    chars = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(secrets.choice(chars) for _ in range(length))

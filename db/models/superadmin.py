@@ -3,7 +3,7 @@ from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from sqlalchemy.dialects.postgresql import JSONB
 from db.models.base import Base
 
 
@@ -134,9 +134,10 @@ class AdminUser(Base):
     )
 
     username: Mapped[str] = mapped_column(
-        String(50), nullable=False, unique=True
+        String, nullable=False, unique=True
     )
     email: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    email_hash: Mapped[str]= mapped_column(String, unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
     profile_picture: Mapped[Optional[str]] = mapped_column(
         String(255), default=None
@@ -170,3 +171,60 @@ class AdminUser(Base):
     __table_args__ = (
         UniqueConstraint("username", "email", name="unique_username_email"),
     )
+
+
+class VendorSignup(Base):
+    __tablename__ = "ven_signup"
+    sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement= True)
+    signup_id: Mapped[str] = mapped_column(
+        String(length=6), unique=True
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    email_hash: Mapped[str]= mapped_column(String, unique=True, nullable=False)
+    password: Mapped[str] = mapped_column(String, unique= True)
+    email_token: Mapped[str] = mapped_column(String, unique=True)
+    email_flag: Mapped[bool] = mapped_column(Boolean, default=False)
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    
+class VendorLogin(Base):
+    __tablename__ = "ven_login"
+    sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement= True)
+    user_id: Mapped[str] = mapped_column(
+        String(length=6), unique=True
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    email_hash: Mapped[str]= mapped_column(String, unique=True, nullable=False)
+    password: Mapped[str] = mapped_column(String, unique= True)
+  
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    business_profile_id: Mapped[str] = mapped_column(
+        String(length=6), primary_key=True, unique=True
+    )
+    user_profile_id: Mapped[str] = mapped_column(
+        String(length=6), primary_key=True, unique=True
+    )
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    login_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    login_failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class BusinessProfile(Base):
+    __tablename__ = "ven_businessprofile"
+
+    sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    abn_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    abn_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False) 
+    profile_ref_id: Mapped[str] = mapped_column(String(length=6), unique=True, nullable=False)
+    profile_details: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    business_logo: Mapped[str] = mapped_column(String, nullable=False)
+    is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
