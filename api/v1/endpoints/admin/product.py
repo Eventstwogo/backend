@@ -3,8 +3,8 @@ import json
 from typing import Dict, List, Optional
 from psycopg2 import IntegrityError
 from slugify import slugify
-from sqlalchemy import func
 # from core.upload_files_to_space import upload_file_to_s3
+from sqlalchemy.orm import selectinload
 from utils.id_generators import generate_lowercase
 from schemas.products import ProductResponse
 from fastapi import APIRouter, Depends, File, Form, UploadFile
@@ -219,16 +219,19 @@ async def get_product_by_id(product_id: str, db: AsyncSession = Depends(get_db))
             log_error=True,
         )
 
-
-
-@router.get("/by-vendor/{vendor_id}", response_model=List[ProductResponse], status_code=200)
+@router.get("/by-vendor/{vendor_id}", response_model=List[ProductResponse])
 async def get_products_by_vendor_id(
     vendor_id: str,
     db: AsyncSession = Depends(get_db),
 ):
     try:
         result = await db.execute(
-            select(Product).filter(Product.vendor_id == vendor_id)
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.subcategory),
+            )
+            .filter(Product.vendor_id == vendor_id)
         )
         products = result.scalars().all()
 
@@ -239,7 +242,29 @@ async def get_products_by_vendor_id(
                 log_error=False,
             )
 
-        return products
+        # Map products into the correct response model
+        response = []
+        for product in products:
+            response.append(
+                ProductResponse(
+                    product_id=product.product_id,
+                    vendor_id=product.vendor_id,
+                    slug=product.slug,
+                    identification=product.identification,
+                    descriptions=product.descriptions,
+                    pricing=product.pricing,
+                    inventory=product.inventory,
+                    physical_attributes=product.physical_attributes,
+                    images=product.images,
+                    tags_and_relationships=product.tags_and_relationships,
+                    status_flags=product.status_flags,
+                    timestamp=product.timestamp,
+                    category_name=product.category.category_name if product.category else None,
+                    subcategory_name=product.subcategory.subcategory_name if product.subcategory else None,
+                )
+            )
+
+        return response
 
     except Exception as e:
         return APIResponse.response(
@@ -247,6 +272,8 @@ async def get_products_by_vendor_id(
             f"Failed to retrieve products: {str(e)}",
             log_error=True,
         )
+
+
 
 
 @router.put("/{product_id}", response_model=ProductResponse, status_code=200)

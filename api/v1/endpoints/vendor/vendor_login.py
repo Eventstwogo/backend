@@ -68,7 +68,8 @@ async def login_user(
 
     profile_stmt = select(
     BusinessProfile.is_approved,
-    BusinessProfile.ref_number
+    BusinessProfile.ref_number,
+    BusinessProfile.industry 
         ).where(
             BusinessProfile.profile_ref_id == user.business_profile_id
         )
@@ -81,7 +82,7 @@ async def login_user(
     else:
         is_approved, ref_number, industry = False, "", ""
 
-        user_info = AdminUserInfo(
+    user_info = AdminUserInfo(
             is_approved=is_approved,
             ref_number=ref_number,
             industry=industry,

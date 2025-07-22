@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, root_validator
 from typing import Optional, Dict, List, Any
 from datetime import datetime
 
@@ -79,22 +79,22 @@ class ProductCreate(BaseModel):
 
 class ProductResponse(BaseModel):
     product_id: str
-    vendor_id:str
-    category_id: str
-    subcategory_id: Optional[str] = None
-    identification: Dict[str, Any]
-    descriptions: Optional[Dict[str, Any]] = None
-    pricing: Optional[Dict[str, Any]] = None
-    inventory: Optional[Dict[str, Any]] = None
-    physical_attributes: Optional[Dict[str, Any]] = None
-    images: Optional[Dict[str, Any]] = None
-    tags_and_relationships: Optional[Dict[str, Any]] = None
-    status_flags: Optional[Dict[str, Any]] = None
-    timestamp: datetime
+    vendor_id: str
     slug: str
+    identification: Dict[str, Any]
+    descriptions: Optional[Dict[str, Any]]
+    pricing: Optional[Dict[str, Any]]
+    inventory: Optional[Dict[str, Any]]
+    physical_attributes: Optional[Dict[str, Any]]
+    images: Optional[Dict[str, Any]]
+    tags_and_relationships: Optional[Dict[str, Any]]
+    status_flags: Dict[str, bool]
+    timestamp: Optional[datetime]
+    
+    category_name: Optional[str]
+    subcategory_name: Optional[str]
 
-    class Config:
-        orm_mode = True
+    
 
 class ProductSearchResult(BaseModel):
     product_id: str
