@@ -21,7 +21,6 @@ from schemas.register import (
 from services.admin_user import get_config_or_404
 from services.vendor_user import validate_unique_user
 from utils.email import send_welcome_email
-from utils.exception_handlers import exception_handler
 from utils.file_uploads import (
     get_media_url,
 )
@@ -48,8 +47,7 @@ async def register_user(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
 
-    # Encrypt data for storage
-    encrypted_username = encrypt_data(user_data.username)
+   
     encrypted_email = encrypt_data(user_data.email)
 
 
@@ -73,12 +71,12 @@ async def register_user(
 
     new_user = VendorSignup(
         signup_id=signup_id,
-        name=encrypted_username,
+       
        
         password=hashed_password,
         email=encrypted_email,
         email_hash=email_hash,
-        category=user_data.category,
+       
         email_token=email_token,
     )
 
@@ -91,7 +89,7 @@ async def register_user(
     background_tasks.add_task(
         send_welcome_email,
         email=user_data.email,
-        username=user_data.username,
+        
         password=config.default_password,
         logo_url=logo_url,
     )
@@ -102,7 +100,6 @@ async def register_user(
         data=VendorRegisterResponse(
             signup_id=signup_id,
             email=user_data.email,
-            username=user_data.username,
-            category=user_data.category,
+           
         ),
     )

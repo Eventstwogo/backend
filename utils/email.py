@@ -140,11 +140,11 @@ email_sender = EmailSender(config)
 
 
 def send_welcome_email(
-    email: EmailStr, username: str, password: str, logo_url: str
+    email: EmailStr,  password: str, logo_url: str
 ) -> None:
     """Send a welcome email to a new user."""
     context = {
-        "username": username,
+       
         "welcome_url": f"{settings.FRONTEND_URL}",
         "password": password,
         "logo_url": logo_url,

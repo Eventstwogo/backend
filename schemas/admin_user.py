@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from pydantic import (
     BaseModel,
@@ -151,12 +151,15 @@ class AdminLoginRequest(BaseModel):
     password: str = Field(..., description="User password")
 
 
+class AdminUserInfo(BaseModel):
+    is_approved: bool
+    ref_number: str
+    industry: str
+
 class AdminLoginResponse(BaseModel):
     access_token: str
-    token_type: str = "bearer"
     message: str
-
-
+    user: Optional[AdminUserInfo] = None
 
 
 class UpdatePasswordBody(BaseModel):
@@ -165,3 +168,9 @@ class UpdatePasswordBody(BaseModel):
 
 class UpdatePasswordResponse(BaseModel):
     message: str    
+
+
+
+class AdminResetPassword(BaseModel):
+    new_password: str
+    confirm_new_password: str    

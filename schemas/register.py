@@ -10,23 +10,14 @@ from pydantic import (
 )
 
 from utils.email_validators import EmailValidator
-from utils.security_validators import contains_xss
 from utils.validators import (
-    has_excessive_repetition,
-    is_valid_username,
     normalize_whitespace,
     validate_length_range,
 )
 
 
 class VendorRegisterRequest(BaseModel):
-    username: str = Field(
-        ...,
-        min_length=3,
-        max_length=255,
-        title="Username",
-        description="Unique username for the vendor. Must be 4-32 characters, and start with 3 letters. Letters, numbers, spaces, and hyphens are allowed.",
-    )
+    
     email: EmailStr = Field(
         ...,
         title="Email Address",
@@ -40,48 +31,40 @@ class VendorRegisterRequest(BaseModel):
         description="Secure password for the vendor. Must be exactly 8-12 characters long.",
     )
 
-    category: str = Field(
-         ...,
-        min_length=6,
-        max_length=6,
-        title="Category",
-        description="Category of the  vendor's business. Must be exactly 6 characters long.",
-    )
+   
 
     @model_validator(mode="before")
     @classmethod
     def validate_fields(cls, values):
-        if not values.get("username"):
-            raise ValueError("Username is required.")
+        
         if not values.get("email"):
             raise ValueError("Email is required.")
         if not values.get("password"):
             raise ValueError("Password is required.")
-        if not values.get("category"):
-            raise ValueError("Category is required.")
+       
         return values
 
-    @field_validator("username")
-    @classmethod
-    def validate_username(cls, v):
-        v = normalize_whitespace(v)
-        if not v:
-            raise ValueError("Username cannot be empty.")
-        if not is_valid_username(v, allow_spaces=True, allow_hyphens=True):
-            raise ValueError(
-                "Username can only contain letters, numbers, spaces, and hyphens."
-            )
-        if not validate_length_range(v, 4, 32):
-            raise ValueError("Username must be 4-32 characters long.")
-        if contains_xss(v):
-            raise ValueError("Username contains potentially malicious content.")
-        if has_excessive_repetition(v, max_repeats=3):
-            raise ValueError("Username contains excessive repeated characters.")
-        if len(v) < 3 or not all(c.isalpha() for c in v[:3]):
-            raise ValueError(
-                "First three characters of username must be letters."
-            )
-        return v
+    # @field_validator("username")
+    # @classmethod
+    # def validate_username(cls, v):
+    #     v = normalize_whitespace(v)
+    #     if not v:
+    #         raise ValueError("Username cannot be empty.")
+    #     if not is_valid_username(v, allow_spaces=True, allow_hyphens=True):
+    #         raise ValueError(
+    #             "Username can only contain letters, numbers, spaces, and hyphens."
+    #         )
+    #     if not validate_length_range(v, 4, 32):
+    #         raise ValueError("Username must be 4-32 characters long.")
+    #     if contains_xss(v):
+    #         raise ValueError("Username contains potentially malicious content.")
+    #     if has_excessive_repetition(v, max_repeats=3):
+    #         raise ValueError("Username contains excessive repeated characters.")
+    #     if len(v) < 3 or not all(c.isalpha() for c in v[:3]):
+    #         raise ValueError(
+    #             "First three characters of username must be letters."
+    #         )
+    #     return v
 
     @field_validator("email")
     @classmethod
@@ -104,28 +87,26 @@ class VendorRegisterRequest(BaseModel):
             raise ValueError("Password must be exactly 8-12 characters long.")
         return v
     
-    @field_validator("category")
-    @classmethod
-    def validate_category(cls, v):
-        v = normalize_whitespace(v)
-        if not v:
-            raise ValueError("Category cannot be empty.")
-        # Ensure category is exactly 6 characters long
-        if not validate_length_range(v, 6, 6):
-            raise ValueError("Category must be exactly 6 characters long.")
-        return v
+    # @field_validator("category")
+    # @classmethod
+    # def validate_category(cls, v):
+    #     v = normalize_whitespace(v)
+    #     if not v:
+    #         raise ValueError("Category cannot be empty.")
+    #     # Ensure category is exactly 6 characters long
+    #     if not validate_length_range(v, 6, 6):
+    #         raise ValueError("Category must be exactly 6 characters long.")
+    #     return v
 
 
 class VendorRegisterResponse(BaseModel):
     signup_id: str
     email: EmailStr
-    username: str
-    category: str
+    
 
 
 class VendorUser(BaseModel):
     user_id: str
-    username: str
     email: EmailStr
     password: str
     created_at: datetime

@@ -57,17 +57,13 @@ async def business_profile(
     )
 
 
-
 @router.get("/business-profile", status_code=200)
 async def get_business_profile(
-    abn_id: str = Query(..., min_length=11, max_length=11),
+    profile_ref_id: str = Query(..., min_length=6, max_length=12),
     db: AsyncSession = Depends(get_db)
 ):
-    abn_id = validate_abn_id(abn_id)
-    abn_hash = hash_data(abn_id)
-
     result = await db.execute(
-        select(BusinessProfile).where(BusinessProfile.abn_hash == abn_hash)
+        select(BusinessProfile).where(BusinessProfile.profile_ref_id == profile_ref_id)
     )
     profile = result.scalar_one_or_none()
 
@@ -77,12 +73,26 @@ async def get_business_profile(
             detail="Business profile not found"
         )
 
+    # Decrypt and deserialize profile_details
     encrypted_profile_dict = json.loads(profile.profile_details)
     decrypted_profile = decrypt_dict_values(encrypted_profile_dict)
 
+    # Deserialize purpose if it's JSON
+    try:
+        purpose_list = json.loads(profile.purpose)
+    except Exception:
+        purpose_list = profile.purpose  # fallback if not a JSON string
+
     return {
-        "abn_id": abn_id,
         "profile_ref_id": profile.profile_ref_id,
         "profile_details": decrypted_profile,
-        "is_approved": profile.is_approved
+        "business_logo": profile.business_logo,
+        "payment_preference": profile.payment_preference,
+        "store_name": profile.store_name,
+        "store_url": profile.store_url,
+        "industry": profile.industry,
+        "ref_number": profile.ref_number,
+        "purpose": purpose_list,
+        "is_approved": profile.is_approved,
+        "timestamp": profile.timestamp
     }

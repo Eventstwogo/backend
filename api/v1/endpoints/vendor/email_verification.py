@@ -28,11 +28,9 @@ async def copy_data(db: AsyncSession, user_email: str, encrypted_email: str):
 
         new_user_login = VendorLogin(
             user_id=user_id,
-            name=existing_user.name,
             email=encrypted_email,
             email_hash=existing_user.email_hash,
             password=existing_user.password,
-            category=existing_user.category,
             business_profile_id=business_profile_id,
             user_profile_id=user_profile_id,
         )

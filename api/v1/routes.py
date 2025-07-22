@@ -11,21 +11,29 @@ from api.v1.endpoints import (
     sub_categories_by_id,
     sub_categories_by_slug,
     subcategories,
+    industries,
+ 
 )
 
 
-from api.v1.endpoints.vendor import vendor_signup, email_verification, business_profile
-from api.v1.endpoints.admin import registration, admin_login, password_manager
+from api.v1.endpoints.vendor import vendor_signup, email_verification, business_profile, vendor_login, vendor_onboarding
+from api.v1.endpoints.admin import registration, admin_login, password_manager, product
+from api.v1.endpoints.vendor import vendor_category_mapping
+
 
 api_router = APIRouter(prefix="/api/v1")
 
 
 # KYC Endpoints
-# api_router.include_router(abn_check.router, prefix="/abn_check", tags=["ABN"])
+api_router.include_router(abn_check.router, prefix="/abn_check", tags=["ABN"])
 
 
 # Role Endpoints
 api_router.include_router(roles.router, prefix="/roles", tags=["Roles"])
+
+api_router.include_router(
+    industries.router, prefix="/industries", tags=["Industries"]
+)
 
 
 # Category Endpoints
@@ -60,10 +68,16 @@ api_router.include_router(
     tags=["categories or subcategories by id"],
 )
 
+api_router.include_router(product.router, prefix="/products", tags=["Products"])
+
 
 # Configuration Endpoints
 api_router.include_router(
     config.router, prefix="/config", tags=["Configuration"]
+)
+
+api_router.include_router(
+    vendor_category_mapping.router, prefix="/mapping", tags=["Vendor Category Management"]
 )
 
 
@@ -74,12 +88,21 @@ api_router.include_router(
 )
 
 api_router.include_router(
+    vendor_login.router, prefix="/vendor", tags=["Vendor"]
+)
+api_router.include_router(
     email_verification.router, prefix="/vendor", tags=["Vendor"]
 )
 
 api_router.include_router(
     business_profile.router, prefix="/vendor", tags=["Vendor"]
 )
+
+api_router.include_router(
+    vendor_onboarding.router, prefix="/vendor", tags=["Vendor"]
+)
+
+
 
 # Admin User Endpoints
 api_router.include_router(

@@ -1,9 +1,10 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
+from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from db.models.base import Base
 
 
@@ -52,7 +53,10 @@ class Category(Base):
     __tablename__ = "sa_categories"
 
     category_id: Mapped[str] = mapped_column(
-        String, primary_key=True, unique=True
+        String(length=6), primary_key=True, unique=True
+    )
+    industry_id: Mapped[str] = mapped_column(
+        String(length=6), primary_key=True, unique=True
     )
     category_name: Mapped[str] = mapped_column(String, nullable=False)
     category_description: Mapped[str | None] = mapped_column(
@@ -84,12 +88,16 @@ class Category(Base):
         back_populates="category", cascade="all, delete-orphan"
     )
 
+    products: Mapped[list["Product"]] = relationship(
+    back_populates="category", cascade="all, delete-orphan"
+)
+
 
 class SubCategory(Base):
     __tablename__ = "sa_subcategories"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, unique=True)
-    subcategory_id: Mapped[str] = mapped_column(String, unique=True)
+    subcategory_id: Mapped[str] = mapped_column(String(length=6), unique=True)
     category_id: Mapped[str] = mapped_column(
         ForeignKey(column="sa_categories.category_id"), nullable=False
     )
@@ -120,6 +128,10 @@ class SubCategory(Base):
 
     # Relationship to Category
     category: Mapped["Category"] = relationship(back_populates="subcategories")
+
+    products: Mapped[list["Product"]] = relationship(
+    back_populates="subcategory", cascade="all, delete-orphan"
+)
 
 
 
@@ -179,13 +191,11 @@ class VendorSignup(Base):
     signup_id: Mapped[str] = mapped_column(
         String(length=6), unique=True
     )
-    name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email_hash: Mapped[str]= mapped_column(String, unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String, unique= True)
     email_token: Mapped[str] = mapped_column(String, unique=True)
     email_flag: Mapped[bool] = mapped_column(Boolean, default=False)
-    category: Mapped[str] = mapped_column(String, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     
@@ -195,7 +205,6 @@ class VendorLogin(Base):
     user_id: Mapped[str] = mapped_column(
         String(length=6), unique=True
     )
-    name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email_hash: Mapped[str]= mapped_column(String, unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String, unique= True)
@@ -207,9 +216,9 @@ class VendorLogin(Base):
     user_profile_id: Mapped[str] = mapped_column(
         String(length=6), primary_key=True, unique=True
     )
-    category: Mapped[str] = mapped_column(String, nullable=False)
     login_attempts: Mapped[int] = mapped_column(Integer, default=0)
     login_failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -222,9 +231,88 @@ class BusinessProfile(Base):
     sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     abn_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     abn_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False) 
-    profile_ref_id: Mapped[str] = mapped_column(String(length=6), unique=True, nullable=False)
+    profile_ref_id: Mapped[str] = mapped_column(
+        String(length=6), primary_key=True, unique=True
+    )
     profile_details: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    business_logo: Mapped[str] = mapped_column(String, nullable=False)
+    business_logo: Mapped[str] = mapped_column(String, nullable=True)
+    payment_preference: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
+    store_name: Mapped[str] = mapped_column(String, nullable=True)
+    store_url: Mapped[str] = mapped_column(String, nullable=True)
+    industry: Mapped[str] = mapped_column(String, nullable=True)
+    location: Mapped[str] = mapped_column(String, nullable=True)
+    ref_number: Mapped[str] = mapped_column(
+        String(length=6), primary_key=True, unique=True
+    )
+    purpose: Mapped[dict] = mapped_column(JSONB, nullable=False)
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+
+class Industries(Base):
+    __tablename__ = "ven_industries"
+
+    sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    industry_id:Mapped[str] = mapped_column(
+        String(length=6), unique=True
+    )
+    industry_name: Mapped[str] = mapped_column(String, unique=True, nullable=False) 
+    industry_slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class VendorCategoryManagement(Base):
+    __tablename__ = "ven_categorymanagement"
+
+    sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    vendor_ref_id:Mapped[str] = mapped_column(
+        String(length=6), unique=True
+    )
+    category_id: Mapped[str] = mapped_column(String(length=6), unique=True, nullable=False) 
+    subcategory_id: Mapped[str] = mapped_column(String(length=6), unique=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+
+class Product(Base):
+    __tablename__ = "ven_products"
+
+    product_id: Mapped[str] = mapped_column(String, primary_key=True, unique=True)
+
+    vendor_id: Mapped[str] = mapped_column(String, nullable=False)
+
+    category_id: Mapped[str] = mapped_column(
+        ForeignKey("sa_categories.category_id"), nullable=False
+    )
+    subcategory_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("sa_subcategories.subcategory_id"), nullable=True
+    )
+
+    slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+
+    identification: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    descriptions: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB)
+    pricing: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB)
+    inventory: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB)
+    physical_attributes: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB)
+    images: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB)
+    tags_and_relationships: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB)
+
+    status_flags: Mapped[Dict[str, bool]] = mapped_column(
+        MutableDict.as_mutable(JSONB),
+        default=lambda: {
+            "featured_product": False,
+            "published_product": False,
+            "product_status": False,
+        },
+    )
+
+    timestamp: Mapped[Optional[DateTime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Relationships
+    category: Mapped["Category"] = relationship(back_populates="products")
+    subcategory: Mapped[Optional["SubCategory"]] = relationship(back_populates="products")

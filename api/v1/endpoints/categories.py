@@ -46,6 +46,7 @@ router = APIRouter()
 @exception_handler
 async def create_category_or_subcategory(
     category_id: Optional[str] = Form(None),
+    industry_id: Optional[str] = Form(None),
     name: str = Form(...),
     slug: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
@@ -140,6 +141,7 @@ async def create_category_or_subcategory(
     # Create Category
     new_category = Category(
         category_id=generate_digits_uppercase(6),
+        industry_id=industry_id,
         category_name=name,
         category_slug=final_slug,
         category_description=description,
