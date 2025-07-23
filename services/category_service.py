@@ -62,10 +62,11 @@ def validate_category_data(
     if description:
         description = sanitize_input(description).strip()
         description = normalize_whitespace(description)
-        if not re.fullmatch(r"[A-Za-z\s.-]+", description):
+        # Allow more characters in description: letters, numbers, spaces, periods, commas, hyphens, parentheses, etc.
+        if not re.fullmatch(r"[A-Za-z0-9\s.,-()&'\"!?:;]+", description):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                detail="Description must contain only letters, spaces, and periods.",
+                detail="Description contains invalid characters.",
             )
         if is_single_reserved_word(description):
             raise HTTPException(
@@ -81,10 +82,11 @@ def validate_category_data(
     if meta_title:
         meta_title = sanitize_input(meta_title).strip()
         meta_title = normalize_whitespace(meta_title)
-        if not re.fullmatch(r"[A-Za-z\s.]+", meta_title):
+        # Allow more characters in meta title: letters, numbers, spaces, periods, commas, hyphens, etc.
+        if not re.fullmatch(r"[A-Za-z0-9\s.,-()&'\"!?:;]+", meta_title):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                detail="Meta title must contain only letters, spaces, and periods.",
+                detail="Meta title contains invalid characters.",
             )
         if is_single_reserved_word(meta_title):
             raise HTTPException(
@@ -100,10 +102,11 @@ def validate_category_data(
     if meta_description:
         meta_description = sanitize_input(meta_description).strip()
         meta_description = normalize_whitespace(meta_description)
-        if not re.fullmatch(r"[A-Za-z\s.-]+", meta_description):
+        # Allow more characters in meta description: letters, numbers, spaces, periods, commas, hyphens, etc.
+        if not re.fullmatch(r"[A-Za-z0-9\s.,-()&'\"!?:;]+", meta_description):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                detail="Meta description must contain only letters, spaces, and periods.",
+                detail="Meta description contains invalid characters.",
             )
         if is_single_reserved_word(meta_description):
             raise HTTPException(
@@ -475,53 +478,59 @@ def validate_subcategory_fields(
             detail="Python reserved words are not allowed in slugs.",
         )
 
-    if description and not validate_length(description, 0, 500):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Description too long. Max 500 characters.",
-        )
-    if not re.fullmatch(r"[A-Za-z\s.-]+", description):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Description must contain only letters, spaces, and periods.",
-        )
-    if is_single_reserved_word(description):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Python reserved words are not allowed in descriptions.",
-        )
+    if description:
+        if not validate_length(description, 0, 500):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Description too long. Max 500 characters.",
+            )
+        # Allow more characters in description: letters, numbers, spaces, periods, commas, hyphens, parentheses, etc.
+        if not re.fullmatch(r"[A-Za-z0-9\s.,-()&'\"!?:;]+", description):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Description contains invalid characters.",
+            )
+        if is_single_reserved_word(description):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Python reserved words are not allowed in descriptions.",
+            )
 
-    if meta_title and not validate_length(meta_title, 0, 70):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Meta title too long. Max 70 characters.",
-        )
-    if meta_title and not re.fullmatch(r"[A-Za-z\s.]+", meta_title):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Meta title must contain only letters, spaces, and periods.",
-        )
-    if is_single_reserved_word(meta_title):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Python reserved words are not allowed in meta titles.",
-        )
+    if meta_title:
+        if not validate_length(meta_title, 0, 70):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Meta title too long. Max 70 characters.",
+            )
+        # Allow more characters in meta title: letters, numbers, spaces, periods, commas, hyphens, etc.
+        if not re.fullmatch(r"[A-Za-z0-9\s.,-()&'\"!?:;]+", meta_title):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Meta title contains invalid characters.",
+            )
+        if is_single_reserved_word(meta_title):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Python reserved words are not allowed in meta titles.",
+            )
 
-    if meta_description and not validate_length(meta_description, 0, 160):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Meta description too long. Max 160 characters.",
-        )
-    if meta_description and not re.fullmatch(r"[A-Za-z\s.-]+", meta_description):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Meta description must contain only letters, spaces, and periods.",
-        )
-    if is_single_reserved_word(meta_description):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Python reserved words are not allowed in meta descriptions.",
-        )
+    if meta_description:
+        if not validate_length(meta_description, 0, 160):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Meta description too long. Max 160 characters.",
+            )
+        # Allow more characters in meta description: letters, numbers, spaces, periods, commas, hyphens, etc.
+        if not re.fullmatch(r"[A-Za-z0-9\s.,-()&'\"!?:;]+", meta_description):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Meta description contains invalid characters.",
+            )
+        if is_single_reserved_word(meta_description):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Python reserved words are not allowed in meta descriptions.",
+            )
 
     return name, slug, description, meta_title, meta_description
 

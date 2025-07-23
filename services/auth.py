@@ -36,20 +36,11 @@ async def check_account_lock(
     user: AdminUser, db: AsyncSession
 ) -> JSONResponse | None:
     if user.login_status == 1:
-        if user.last_login and (
-            datetime.now(timezone.utc) - user.last_login
-        ) < timedelta(hours=24):
-            return api_response(
-                status_code=status.HTTP_423_LOCKED,
-                message=(
-                    "Account is temporarily locked due to multiple failed login attempts. "
-                    "Try again after 24 hours."
-                ),
-                log_error=True,
-            )
-        user.login_status = 0
-        user.login_attempts = 0
-        await db.commit()
+        return api_response(
+            status_code=status.HTTP_423_LOCKED,
+            message="Account is locked. Try after 24 hours.",
+            log_error=True,
+        )
     return None
 
 
@@ -88,7 +79,7 @@ async def check_password_expiry(user: AdminUser, now: datetime) -> bool:
     if user.days_180_flag:
         if user.days_180_timestamp:
             if (now - user.days_180_timestamp).days >= 180:
-                user.login_status = 2
+                user.login_status = 1  # Lock account for password expiry
                 return True
         else:
             user.days_180_timestamp = now

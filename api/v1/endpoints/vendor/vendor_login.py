@@ -1,17 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime
+from datetime import datetime, timedelta
 from passlib.context import CryptContext
+from pydantic import BaseModel
 
 from utils.id_generators import hash_data
-from db.models.superadmin import BusinessProfile, VendorLogin, Config
+from db.models.superadmin import BusinessProfile, VendorLogin, VendorSignup, Config
 from schemas.admin_user import AdminLoginRequest, AdminLoginResponse, AdminUserInfo
 from db.sessions.database import get_db
 from utils.jwt import create_access_token
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 router = APIRouter()
+
+# Schema for store name availability check
+class StoreNameCheckRequest(BaseModel):
+    store_name: str
+
+class StoreNameCheckResponse(BaseModel):
+    status_code: int
+    message: str
 
 
 
@@ -24,7 +34,16 @@ async def login_user(
 ):
     
     email_hash = hash_data(login_data.email)
-    # Find user by username or email
+    
+    # First check if user exists in VendorSignup and email verification status
+    signup_stmt = select(VendorSignup).where(VendorSignup.email_hash == email_hash)
+    signup_result = await db.execute(signup_stmt)
+    signup_user = signup_result.scalar_one_or_none()
+    
+    if signup_user and not signup_user.email_flag:
+        raise HTTPException(status_code=403, detail="Please verify your email before logging in. Check your inbox for the verification link.")
+    
+    # Find user by email in VendorLogin table
     stmt = select(VendorLogin).where(
         VendorLogin.email_hash == email_hash
     )
@@ -32,39 +51,49 @@ async def login_user(
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    if user.is_verified:
-       raise HTTPException(status_code=402, detail="Your business profile is under verification, check again later.")
+        raise HTTPException(status_code=401, detail="Account not found")
 
-    if user.login_attempts >= MAX_LOGIN_ATTEMPTS:
-        raise HTTPException(status_code=403, detail="Account locked due to too many failed login attempts.")
+    # Check if account is locked
+    if user.login_status == 1:
+        raise HTTPException(status_code=423, detail="Account is locked. Try after 24 hours.")
 
     # Compare password
     if not pwd_context.verify(login_data.password, user.password):
-        user.login_attempts += 1
+        # Increment failed login attempts
+        user.login_failed_attempts += 1
+        
+        # Check if we've reached the maximum failed attempts
+        if user.login_failed_attempts >= MAX_LOGIN_ATTEMPTS:
+            user.login_status = 1  # Lock the account
+            user.locked_time = datetime.utcnow()
+            db.add(user)
+            await db.commit()
+            raise HTTPException(status_code=423, detail="Account is locked. Try after 24 hours.")
+        
+        db.add(user)
         await db.commit()
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        remaining_attempts = MAX_LOGIN_ATTEMPTS - user.login_failed_attempts
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Incorrect password. {remaining_attempts} attempts remaining before account lock."
+        )
 
     if user.is_active:
-        raise HTTPException(status_code=403, detail="Account is not active")
+        raise HTTPException(status_code=403, detail="User is inactive")
 
-    # Get default password from config to compare
-    config_stmt = select(Config)
-    config_result = await db.execute(config_stmt)
-    config = config_result.scalar_one_or_none()
+    if not user.is_verified:
+       raise HTTPException(status_code=402, detail="Your business profile is under verification, check again later.")
 
-    if not config:
-        raise HTTPException(status_code=500, detail="System configuration missing.")
-
-    # Determine login status based on default password
-    using_default_password = pwd_context.verify(login_data.password, config.default_password_hash)
-    user.login_status = -1 if using_default_password else 1
-
-    # Reset attempts, update login time
-    user.login_attempts = 0
+    # Successful login - update login tracking
+    user.login_attempts += 1  # Increment successful login attempts
+    user.login_failed_attempts = 0  # Reset failed attempts on successful login
     user.last_login = datetime.utcnow()
+    user.login_status = 0  # Set to active
+    
+    # Ensure the user object is added to the session and commit changes
+    db.add(user)
     await db.commit()
+    await db.refresh(user)
 
     profile_stmt = select(
     BusinessProfile.is_approved,
@@ -102,5 +131,35 @@ async def login_user(
         access_token=access_token,
         user=user_info,
         message="Login successful"
+    )
+
+
+@router.post("/check-store-name-availability", response_model=StoreNameCheckResponse)
+async def check_store_name_availability(
+    request: StoreNameCheckRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Check if store name is available for use.
+    """
+    # Query BusinessProfile table to check if store name already exists
+    stmt = select(BusinessProfile).where(
+        BusinessProfile.store_name == request.store_name.strip()
+    )
+    result = await db.execute(stmt)
+    existing_store = result.scalar_one_or_none()
+    
+    if existing_store:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={
+                "status_code": status.HTTP_409_CONFLICT,
+                "message": "Store name not available"
+            }
+        )
+    
+    return StoreNameCheckResponse(
+        status_code=status.HTTP_200_OK,
+        message="Store name available"
     )
 

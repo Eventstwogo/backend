@@ -19,7 +19,7 @@ from starlette.responses import JSONResponse
 
 from core.api_response import api_response
 from core.status_codes import APIResponse, StatusCode
-from db.models.superadmin import Category, SubCategory
+from db.models.superadmin import Category, SubCategory, Industries
 from db.sessions.database import get_db
 from schemas.categories import CategoryOut
 from services.category_service import (
@@ -80,6 +80,21 @@ async def create_category_or_subcategory(
 
     final_slug = slugify(slug)
 
+    # Validate industry_id if provided for category creation
+    if not is_subcategory and industry_id:
+        industry_result = await db.execute(
+            select(Industries).where(Industries.industry_id == industry_id)
+        )
+        industry = industry_result.scalar_one_or_none()
+        if not industry:
+            return api_response(
+                status.HTTP_404_NOT_FOUND, "Industry ID not found"
+            )
+        if industry.is_active:
+            return api_response(
+                status.HTTP_400_BAD_REQUEST, "Industry is inactive"
+            )
+
     if is_subcategory:
         # Subcategory: validate parent category
         result = await db.execute(
@@ -90,6 +105,29 @@ async def create_category_or_subcategory(
             return api_response(
                 status.HTTP_404_NOT_FOUND, "Parent category not found"
             )
+
+        # Validate industry_id if provided for subcategory creation
+        if industry_id:
+            # First check if industry_id exists
+            industry_result = await db.execute(
+                select(Industries).where(Industries.industry_id == industry_id)
+            )
+            industry = industry_result.scalar_one_or_none()
+            if not industry:
+                return api_response(
+                    status.HTTP_404_NOT_FOUND, "Industry ID not found"
+                )
+            if industry.is_active:
+                return api_response(
+                    status.HTTP_400_BAD_REQUEST, "Industry is inactive"
+                )
+            
+            # Check if parent category belongs to the specified industry
+            if parent_category.industry_id != industry_id:
+                return api_response(
+                    status.HTTP_400_BAD_REQUEST, 
+                    "Industry ID does not match parent category's industry"
+                )
 
         # Check for subcategory conflicts
         conflict_error = await validate_subcategory_conflicts(

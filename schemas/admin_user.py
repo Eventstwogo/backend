@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
+from fastapi import Form
 from pydantic import (
     BaseModel,
     EmailStr,
@@ -99,7 +100,6 @@ class AdminRegisterResponse(BaseModel):
     user_id: str
     email: EmailStr
     username: str
-    password: str
 
 
 class AdminUser(BaseModel):
@@ -173,4 +173,39 @@ class UpdatePasswordResponse(BaseModel):
 
 class AdminResetPassword(BaseModel):
     new_password: str
-    confirm_new_password: str    
+    confirm_new_password: str
+
+
+class ForgotPassword(BaseModel):
+    email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v):
+        v = normalize_whitespace(str(v))
+        if not v:
+            raise ValueError("Email cannot be empty.")
+        EmailValidator.validate(str(v))
+        return v.lower()
+
+
+class ResetPasswordWithToken(BaseModel):
+    email: EmailStr
+    token: str
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v):
+        v = normalize_whitespace(str(v))
+        if not v:
+            raise ValueError("Email cannot be empty.")
+        EmailValidator.validate(str(v))
+        return v.lower()
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        return v    

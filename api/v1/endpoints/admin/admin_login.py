@@ -30,13 +30,12 @@ async def login_user(
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=404, detail="Account not found")
     
-    if user.login_status == -1:
-       raise HTTPException(status_code=402, detail="Please change your default password")
-
-    if user.login_attempts >= MAX_LOGIN_ATTEMPTS:
-        raise HTTPException(status_code=403, detail="Account locked due to too many failed login attempts.")
+    # Check if account is locked
+    if user.login_status == 1:
+        raise HTTPException(status_code=423, detail="Account is locked. Try after 24 hours.")
+    
 
     # Compare password
     if not pwd_context.verify(login_data.password, user.password):
@@ -47,20 +46,9 @@ async def login_user(
     if user.is_active:
         raise HTTPException(status_code=403, detail="Account is not active")
 
-    # Get default password from config to compare
-    config_stmt = select(Config)
-    config_result = await db.execute(config_stmt)
-    config = config_result.scalar_one_or_none()
-
-    if not config:
-        raise HTTPException(status_code=500, detail="System configuration missing.")
-
-    # Determine login status based on default password
-    using_default_password = pwd_context.verify(login_data.password, config.default_password_hash)
-    user.login_status = -1 if using_default_password else 1
-
-    # Reset attempts, update login time
+    # Reset attempts, update login time, set to active
     user.login_attempts = 0
+    user.login_status = 0  # Set to active
     user.last_login = datetime.utcnow()
     await db.commit()
 

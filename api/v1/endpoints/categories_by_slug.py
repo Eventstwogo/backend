@@ -17,7 +17,7 @@ from starlette.responses import JSONResponse
 
 from core.api_response import api_response
 from core.config import settings
-from db.models.superadmin import Category
+from db.models.superadmin import Category, Industries
 from db.sessions.database import get_db
 from services.category_service import (
     validate_category_conflicts,
@@ -361,6 +361,7 @@ async def get_category_by_slug(
 @exception_handler
 async def update_category_by_slug(
     category_slug: str,
+    industry_id: Optional[str] = Form(None),
     name: Optional[str] = Form(None),
     slug: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
@@ -378,6 +379,21 @@ async def update_category_by_slug(
 
     if not category:
         return api_response(status.HTTP_404_NOT_FOUND, "Category not found")
+
+    # === Validate industry_id if provided ===
+    if industry_id and industry_id.strip():
+        industry_result = await db.execute(
+            select(Industries).where(Industries.industry_id == industry_id.strip())
+        )
+        industry = industry_result.scalar_one_or_none()
+        if not industry:
+            return api_response(
+                status.HTTP_404_NOT_FOUND, "Industry ID not found"
+            )
+        if industry.is_active:
+            return api_response(
+                status.HTTP_400_BAD_REQUEST, "Industry is inactive"
+            )
 
     # Check if no changes at all
     no_change = (
@@ -504,6 +520,8 @@ async def update_category_by_slug(
         category.featured_category = featured
     if show_in_menu is not None:
         category.show_in_menu = show_in_menu
+    if industry_id is not None and industry_id.strip():
+        category.industry_id = industry_id.strip()
 
     # Handle file upload
     if file and file.filename:
