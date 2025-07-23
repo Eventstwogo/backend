@@ -31,25 +31,28 @@ async def add_vendor_category_mapping(
             detail=f"Category ID {payload.category_id} not found."
         )
 
-    # 2. Check if subcategory exists and belongs to the category
-    sub_stmt = select(SubCategory).where(
-        SubCategory.subcategory_id == payload.subcategory_id,
-        SubCategory.category_id == payload.category_id
-    )
-    sub_result = await db.execute(sub_stmt)
-    subcategory = sub_result.scalar_one_or_none()
-    if not subcategory:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"SubCategory ID {payload.subcategory_id} not found or not under Category ID {payload.category_id}."
+    # 2. If subcategory is provided, check if it exists and belongs to the category
+    if payload.subcategory_id:
+        sub_stmt = select(SubCategory).where(
+            SubCategory.subcategory_id == payload.subcategory_id,
+            SubCategory.category_id == payload.category_id
         )
+        sub_result = await db.execute(sub_stmt)
+        subcategory = sub_result.scalar_one_or_none()
+        if not subcategory:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    f"SubCategory ID {payload.subcategory_id} not found "
+                    f"or does not belong to Category ID {payload.category_id}."
+                )
+            )
 
     # 3. Save to VendorCategoryManagement
     new_entry = VendorCategoryManagement(
         vendor_ref_id=payload.vendor_ref_id,
         category_id=payload.category_id,
-        subcategory_id=payload.subcategory_id,
-        
+        subcategory_id=payload.subcategory_id  # can be None
     )
 
     db.add(new_entry)
@@ -66,6 +69,7 @@ async def add_vendor_category_mapping(
         "status": "success",
         "message": "Vendor category mapping added successfully."
     }
+
 
 
 

@@ -64,20 +64,20 @@ async def create_product(
                     log_error=True
                 )
             
-            # Check for existing product with same vendor_id, cat_id, and subcat_id
-        query = select(Product).filter(
-            Product.vendor_id == vendor_id,
-            Product.category_id == cat_id,
-            Product.subcategory_id == subcat_id if subcat_id else Product.subcategory_id.is_(None)
-        )
-        result = await db.execute(query)
-        existing_product = result.scalars().first()
-        if existing_product:
-            return APIResponse.response(
-                StatusCode.BAD_REQUEST,
-                "A product with this vendor, category, and subcategory already exists",
-                log_error=True
-            )
+        #     # Check for existing product with same vendor_id, cat_id, and subcat_id
+        # query = select(Product).filter(
+        #     Product.vendor_id == vendor_id,
+        #     Product.category_id == cat_id,
+        #     Product.subcategory_id == subcat_id if subcat_id else Product.subcategory_id.is_(None)
+        # )
+        # result = await db.execute(query)
+        # existing_product = result.scalars().first()
+        # if existing_product:
+        #     return APIResponse.response(
+        #         StatusCode.BAD_REQUEST,
+        #         "A product with this vendor, category, and subcategory already exists",
+        #         log_error=True
+        #     )
 
         # Parse JSON fields
         try:
@@ -198,7 +198,6 @@ async def get_all_products(db: AsyncSession = Depends(get_db)):
             log_error=True,
         )
 
-
 @router.get("/{product_id}", response_model=ProductResponse, status_code=200)
 async def get_product_by_id(product_id: str, db: AsyncSession = Depends(get_db)):
     try:
@@ -211,13 +210,87 @@ async def get_product_by_id(product_id: str, db: AsyncSession = Depends(get_db))
                 f"Product with ID {product_id} not found",
                 log_error=False,
             )
-        return product
+
+        # Fetch category/subcategory names
+        category_result = await db.execute(select(Category.category_name).where(Category.category_id == product.category_id))
+        category_name = category_result.scalar()
+
+        subcategory_result = await db.execute(select(SubCategory.subcategory_name).where(SubCategory.subcategory_id == product.subcategory_id))
+        subcategory_name = subcategory_result.scalar()
+
+        # Build and return ProductResponse
+        product_response = ProductResponse(
+            product_id=product.product_id,
+            vendor_id=product.vendor_id,
+            slug=product.slug,
+            identification=product.identification,
+            descriptions=product.descriptions,
+            pricing=product.pricing,
+            inventory=product.inventory,
+            physical_attributes=product.physical_attributes,
+            images=product.images,
+            tags_and_relationships=product.tags_and_relationships,
+            status_flags=product.status_flags,
+            timestamp=product.timestamp,
+            category_name=category_name,
+            subcategory_name=subcategory_name,
+        )
+        return product_response
+
     except Exception as e:
         return APIResponse.response(
             StatusCode.SERVER_ERROR,
             f"Failed to retrieve product: {str(e)}",
             log_error=True,
         )
+
+
+
+
+@router.get("/slug/{slug}", response_model=ProductResponse, status_code=200)
+async def get_product_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
+    try:
+        result = await db.execute(
+            select(Product)
+            .where(Product.slug == slug)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.subcategory)
+            )
+        )
+        product = result.scalars().first()
+
+        if not product:
+            return APIResponse.response(
+                StatusCode.NOT_FOUND,
+                f"Product with slug '{slug}' not found",
+                log_error=False,
+            )
+
+        return ProductResponse(
+            product_id=product.product_id,
+            vendor_id=product.vendor_id,
+            slug=product.slug,
+            identification=product.identification,
+            descriptions=product.descriptions,
+            pricing=product.pricing,
+            inventory=product.inventory,
+            physical_attributes=product.physical_attributes,
+            images=product.images,
+            tags_and_relationships=product.tags_and_relationships,
+            status_flags=product.status_flags,
+            timestamp=product.timestamp,
+            category_name=product.category.category_name if product.category else None,
+            subcategory_name=product.subcategory.subcategory_name if product.subcategory else None,
+        )
+
+    except Exception as e:
+        return APIResponse.response(
+            StatusCode.SERVER_ERROR,
+            f"Failed to retrieve product by slug: {str(e)}",
+            log_error=True,
+        )
+
 
 @router.get("/by-vendor/{vendor_id}", response_model=List[ProductResponse])
 async def get_products_by_vendor_id(
@@ -272,7 +345,6 @@ async def get_products_by_vendor_id(
             f"Failed to retrieve products: {str(e)}",
             log_error=True,
         )
-
 
 
 
@@ -362,7 +434,42 @@ async def update_product(
 
     await db.commit()
     await db.refresh(product)
-    return product
+
+    # Fetch category and subcategory names
+    category_name = None
+    subcategory_name = None
+
+    if product.category_id:
+        result = await db.execute(
+            select(Category.category_name).filter(Category.category_id == product.category_id)
+        )
+        category_name = result.scalar()
+
+    if product.subcategory_id:
+        result = await db.execute(
+            select(SubCategory.subcategory_name).filter(SubCategory.subcategory_id == product.subcategory_id)
+        )
+        subcategory_name = result.scalar()
+
+    return ProductResponse(
+        product_id=product.product_id,
+        vendor_id=product.vendor_id,
+        slug=product.slug,
+        identification=product.identification,
+        descriptions=product.descriptions,
+        pricing=product.pricing,
+        inventory=product.inventory,
+        physical_attributes=product.physical_attributes,
+        images=product.images,
+        tags_and_relationships=product.tags_and_relationships,
+        status_flags=product.status_flags,
+        timestamp=product.timestamp,
+        category_name=category_name,
+        subcategory_name=subcategory_name
+    )
+
+
+
 
 @router.put("/{product_id}/delete", response_model=Dict)
 async def soft_delete_product(product_id: str, db: AsyncSession = Depends(get_db)):

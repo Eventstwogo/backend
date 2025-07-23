@@ -23,7 +23,7 @@ class OnboardingRequest(BaseModel):
     store_name: str = Field(..., min_length=3, max_length=100)
     store_url: HttpUrl
     location: str = Field(..., min_length=2, max_length=100)
-    industry: int = Field(..., ge=1, le=6)  # must be between 1 and 6
+    industry: str
 
     @field_validator('purpose')
     @classmethod

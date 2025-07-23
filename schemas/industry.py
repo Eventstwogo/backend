@@ -27,4 +27,4 @@ class IndustryDetails(BaseModel):
 class VendorCategoryRequest(BaseModel):
     vendor_ref_id: str
     category_id: str
-    subcategory_id: str
+    subcategory_id: Optional[str] = None

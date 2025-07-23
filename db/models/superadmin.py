@@ -267,10 +267,10 @@ class VendorCategoryManagement(Base):
 
     sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     vendor_ref_id:Mapped[str] = mapped_column(
-        String(length=6), unique=True
+        String(length=6)
     )
-    category_id: Mapped[str] = mapped_column(String(length=6), unique=True, nullable=False) 
-    subcategory_id: Mapped[str] = mapped_column(String(length=6), unique=True, nullable=False)
+    category_id: Mapped[str] = mapped_column(String(length=6), nullable=False) 
+    subcategory_id: Mapped[str] = mapped_column(String(length=6), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
