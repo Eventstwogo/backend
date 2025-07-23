@@ -56,7 +56,7 @@ class Category(Base):
         String(length=6), primary_key=True, unique=True
     )
     industry_id: Mapped[str] = mapped_column(
-        String(length=6), primary_key=True, unique=True
+        String(length=6), nullable= False
     )
     category_name: Mapped[str] = mapped_column(String, nullable=False)
     category_description: Mapped[str | None] = mapped_column(

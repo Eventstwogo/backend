@@ -469,6 +469,144 @@ async def update_product(
     )
 
 
+@router.put("/{slug}", response_model=ProductResponse, status_code=200)
+async def update_product_by_slug(
+    slug: str,
+    cat_id: Optional[str] = Form(default=None),
+    subcat_id: Optional[str] = Form(default=None),
+    identification: Optional[str] = Form(default=None),
+    descriptions: Optional[str] = Form(default=None),
+    pricing: Optional[str] = Form(default=None),
+    inventory: Optional[str] = Form(default=None),
+    physical_attributes: Optional[str] = Form(default=None),
+    files: List[UploadFile] = File(default=None),
+    tags_and_relationships: Optional[str] = Form(default=None),
+    status_flags: Optional[str] = Form(default=None),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(Product).filter(Product.slug == slug))
+    product = result.scalars().first()
+
+    if not product:
+        return APIResponse.response(
+            StatusCode.NOT_FOUND,
+            f"Product with slug '{slug}' not found",
+            log_error=True,
+        )
+
+    if cat_id:
+        result = await db.execute(select(Category).filter(Category.category_id == cat_id))
+        if not result.scalars().first():
+            return APIResponse.response(StatusCode.NOT_FOUND, "Category not found", log_error=True)
+        product.category_id = cat_id
+
+    if subcat_id:
+        result = await db.execute(select(SubCategory).filter(SubCategory.subcategory_id == subcat_id))
+        if not result.scalars().first():
+            return APIResponse.response(StatusCode.NOT_FOUND, "Subcategory not found", log_error=True)
+        product.subcategory_id = subcat_id
+
+    try:
+        if identification is not None:
+            product.identification = {**product.identification, **json.loads(identification)}
+
+        if descriptions is not None:
+            desc_data = json.loads(descriptions)
+            product.descriptions = {**(product.descriptions or {}), **desc_data}
+
+        if pricing is not None:
+            price_data = json.loads(pricing)
+            product.pricing = {**(product.pricing or {}), **price_data}
+
+        if inventory is not None:
+            inv_data = json.loads(inventory)
+            product.inventory = {**(product.inventory or {}), **inv_data}
+
+        if physical_attributes is not None:
+            phys_data = json.loads(physical_attributes)
+            product.physical_attributes = {**(product.physical_attributes or {}), **phys_data}
+
+        if tags_and_relationships is not None:
+            tag_data = json.loads(tags_and_relationships)
+            product.tags_and_relationships = {**(product.tags_and_relationships or {}), **tag_data}
+
+        if status_flags is not None:
+            status_data = json.loads(status_flags)
+            product.status_flags = {**product.status_flags, **status_data}
+    except json.JSONDecodeError as e:
+        return APIResponse.response(StatusCode.BAD_REQUEST, f"Invalid JSON data: {str(e)}", log_error=True)
+
+    if files:
+        try:
+            image_urls = []
+            product_name = product.identification.get("product_name", "").replace(" ", "_").lower()
+            cleaned_slug = slug.replace(" ", "_").lower()
+
+            for file in files:
+                timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+                new_filename = f"{timestamp}_{file.filename}"
+                file_path = f"products/{product_name}/{cleaned_slug}/{new_filename}"
+                # image_url = await upload_file_to_s3(file, file_path)
+                # image_urls.append(image_url)
+
+            product.images = {"urls": image_urls}
+        except Exception as e:
+            return APIResponse.response(StatusCode.SERVER_ERROR, f"Failed to upload images: {str(e)}", log_error=True)
+
+    await db.commit()
+    await db.refresh(product)
+
+    # Fetch category and subcategory names
+    category_name = None
+    subcategory_name = None
+
+    if product.category_id:
+        result = await db.execute(
+            select(Category.category_name).filter(Category.category_id == product.category_id)
+        )
+        category_name = result.scalar()
+
+    if product.subcategory_id:
+        result = await db.execute(
+            select(SubCategory.subcategory_name).filter(SubCategory.subcategory_id == product.subcategory_id)
+        )
+        subcategory_name = result.scalar()
+
+    return ProductResponse(
+        product_id=product.product_id,
+        vendor_id=product.vendor_id,
+        slug=product.slug,
+        identification=product.identification,
+        descriptions=product.descriptions,
+        pricing=product.pricing,
+        inventory=product.inventory,
+        physical_attributes=product.physical_attributes,
+        images=product.images,
+        tags_and_relationships=product.tags_and_relationships,
+        status_flags=product.status_flags,
+        timestamp=product.timestamp,
+        category_name=category_name,
+        subcategory_name=subcategory_name
+    )
+
+
+@router.put("/slug/{slug}/delete", response_model=Dict)
+async def soft_delete_product_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Product).filter(Product.slug == slug))
+    product = result.scalars().first()
+
+    if not product:
+        return APIResponse.response(
+            StatusCode.NOT_FOUND,
+            f"Product with slug '{slug}' not found",
+            log_error=True
+        )
+
+    product.status_flags["product_status"] = True
+    await db.commit()
+
+    return {"message": f"Product with slug '{slug}' soft deleted successfully"}
+
 
 
 @router.put("/{product_id}/delete", response_model=Dict)
@@ -505,3 +643,21 @@ async def restore_product(product_id: str, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"message": f"Product {product_id} restored successfully"}
+
+
+@router.put("/slug/{slug}/restore", response_model=Dict)
+async def restore_product(slug: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Product).filter(Product.slug == slug))
+    product = result.scalars().first()
+
+    if not product:
+        return APIResponse.response(
+            StatusCode.NOT_FOUND,
+            f"Product with slug {slug} not found",
+            log_error=True
+        )
+
+    product.status_flags["product_status"] = False
+    await db.commit()
+
+    return {"message": f"Product {slug} restored successfully"}
