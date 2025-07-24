@@ -15,46 +15,46 @@ router = APIRouter()
 
 
 
-@router.post("/business-profile", status_code=status.HTTP_201_CREATED)
-async def business_profile(
-    user_data: VendorBusinessProfileRequest,
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    abn_id = validate_abn_id(user_data.abn_id)
+# @router.post("/business-profile", status_code=status.HTTP_201_CREATED)
+# async def business_profile(
+#     user_data: VendorBusinessProfileRequest,
+#     db: AsyncSession = Depends(get_db),
+# ) -> JSONResponse:
+#     abn_id = validate_abn_id(user_data.abn_id)
 
-    # Lookup by hash
-    if await business_profile_exists(db, abn_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Business profile with this ABN already exists."
-        )
+#     # Lookup by hash
+#     if await business_profile_exists(db, abn_id):
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Business profile with this ABN already exists."
+#         )
 
-    abn_data = await fetch_abn_details(abn_id)
+#     abn_data = await fetch_abn_details(abn_id)
 
-    encrypted_abn_id = encrypt_data(abn_id)
-    abn_hash = hash_data(abn_id)
+#     encrypted_abn_id = encrypt_data(abn_id)
+#     abn_hash = hash_data(abn_id)
 
-    # Encrypt values only
-    encrypted_profile_dict = encrypt_dict_values(abn_data)
-    encrypted_profile_json = json.dumps(encrypted_profile_dict)
+#     # Encrypt values only
+#     encrypted_profile_dict = encrypt_dict_values(abn_data)
+#     encrypted_profile_json = json.dumps(encrypted_profile_dict)
 
-    new_profile = BusinessProfile(
-        profile_ref_id=user_data.business_profile_id,
-        abn_id=encrypted_abn_id,
-        abn_hash=abn_hash,
-        profile_details=encrypted_profile_json,
-        business_logo="",
-        is_approved=False
-    )
+#     new_profile = BusinessProfile(
+#         profile_ref_id=user_data.business_profile_id,
+#         abn_id=encrypted_abn_id,
+#         abn_hash=abn_hash,
+#         profile_details=encrypted_profile_json,
+#         business_logo="",
+#         is_approved=False
+#     )
 
-    db.add(new_profile)
-    await db.commit()
-    await db.refresh(new_profile)
+#     db.add(new_profile)
+#     await db.commit()
+#     await db.refresh(new_profile)
 
-    return api_response(
-        status_code=status.HTTP_201_CREATED,
-        message="User business profile saved successfully.",
-    )
+#     return api_response(
+#         status_code=status.HTTP_201_CREATED,
+#         message="User business profile saved successfully.",
+#     )
 
 
 @router.get("/business-profile", status_code=200)
@@ -87,6 +87,7 @@ async def get_business_profile(
         "profile_ref_id": profile.profile_ref_id,
         "profile_details": decrypted_profile,
         "business_logo": profile.business_logo,
+        "location": profile.location,
         "payment_preference": profile.payment_preference,
         "store_name": profile.store_name,
         "store_url": profile.store_url,

@@ -146,10 +146,10 @@ class AdminUser(Base):
     )
 
     username: Mapped[str] = mapped_column(
-        String, nullable=False, unique=True
+        String(500), nullable=False, unique=True
     )
-    email: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
-    email_hash: Mapped[str]= mapped_column(String, unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
+    email_hash: Mapped[str]= mapped_column(String(500), unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
     profile_picture: Mapped[Optional[str]] = mapped_column(
         String(255), default=None
@@ -162,7 +162,8 @@ class AdminUser(Base):
     )
 
     # Login management
-    login_status: Mapped[int] = mapped_column(Integer, default=-1)
+    # Login status: 0 (active), 1 (locked)
+    login_status: Mapped[int] = mapped_column(Integer, default=0)
     last_login: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=None
     )
@@ -179,10 +180,36 @@ class AdminUser(Base):
 
     # Relationships
     role: Mapped["Role"] = relationship(back_populates="users")
+    password_resets: Mapped[list["PasswordReset"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("username", "email", name="unique_username_email"),
     )
+
+
+class PasswordReset(Base):
+    __tablename__ = "sa_password_resets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("sa_adminusers.user_id"), nullable=False
+    )
+    token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    used_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+    # Relationships
+    user: Mapped["AdminUser"] = relationship(back_populates="password_resets")
 
 
 class VendorSignup(Base):
@@ -218,6 +245,20 @@ class VendorLogin(Base):
     )
     login_attempts: Mapped[int] = mapped_column(Integer, default=0)
     login_failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Login status: 0 (active), 1 (locked)
+    login_status: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Account locking
+    locked_time: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    
+    # Last login tracking
+    last_login: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(

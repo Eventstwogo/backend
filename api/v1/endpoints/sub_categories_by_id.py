@@ -106,6 +106,8 @@ async def update_subcategory(
     if not subcategory:
         return api_response(status.HTTP_404_NOT_FOUND, "Subcategory not found")
 
+
+
     # === Detect No Change ===
     no_change = (
         (name is None or name.strip() == "")

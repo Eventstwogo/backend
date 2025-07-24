@@ -42,6 +42,20 @@ async def register_user(
     encrypted_username = encrypt_data(user_data.username)
     encrypted_email = encrypt_data(user_data.email)
 
+    # Check if encrypted data length is within database limits
+    if len(encrypted_username) > 500:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Username is too long for encryption storage.",
+            log_error=True,
+        )
+    
+    if len(encrypted_email) > 500:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Email is too long for encryption storage.",
+            log_error=True,
+        )
 
     email_hash = hash_data(user_data.email)
 
@@ -69,10 +83,10 @@ async def register_user(
 
     config = config_result
 
-    # Generate unique user ID and random password
+    # Generate unique user ID and use default password for new admins
     user_id = generate_lower_uppercase(length=6)
-    plain_password = generate_random_password()
-    hashed_password = pwd_context.hash(plain_password)
+    plain_password = config.default_password  # Use default password from config
+    hashed_password = config.default_password_hash  # Use pre-hashed default password
 
     # Create new user
     new_user = AdminUser(
@@ -109,6 +123,5 @@ async def register_user(
             user_id=user_id,
             email=user_data.email,
             username=user_data.username,
-            password= plain_password
         ),
     )

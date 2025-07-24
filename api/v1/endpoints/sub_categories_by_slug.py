@@ -17,7 +17,7 @@ from starlette.responses import JSONResponse
 
 from core.api_response import api_response
 from core.config import settings
-from db.models.superadmin import SubCategory
+from db.models.superadmin import SubCategory, Category, Industries
 from db.sessions.database import get_db
 from services.category_service import (
     check_subcategory_conflicts,
@@ -103,6 +103,8 @@ async def update_subcategory_by_slug(
 
     if not subcategory:
         return api_response(status.HTTP_404_NOT_FOUND, "Subcategory not found")
+
+
 
     #  Apply fallback for unchanged fields
     input_name = name or subcategory.subcategory_name

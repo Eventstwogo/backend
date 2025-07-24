@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 
 from core.api_response import api_response
 from core.config import settings
-from db.models.superadmin import Category, SubCategory
+from db.models.superadmin import Category, SubCategory, Industries
 from db.sessions.database import get_db
 from utils.exception_handlers import exception_handler
 from utils.file_uploads import get_media_url, save_uploaded_file
@@ -112,6 +112,7 @@ async def get_category_or_subcategory_details(
 @exception_handler
 async def update_category_or_subcategory(
     item_id: str,
+    industry_id: Optional[str] = Form(None),
     name: Optional[str] = Form(None),
     slug: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
@@ -160,6 +161,25 @@ async def update_category_or_subcategory(
         img_field = "subcategory_img_thumbnail"
         path_template = settings.SUBCATEGORY_IMAGE_PATH
 
+    # === Validate industry_id if provided (only for categories) ===
+    if industry_id and industry_id.strip():
+        if model_type == "category":
+            # Check if industry_id exists
+            industry_result = await db.execute(
+                select(Industries).where(Industries.industry_id == industry_id.strip())
+            )
+            industry = industry_result.scalar_one_or_none()
+            if not industry:
+                return api_response(
+                    status.HTTP_404_NOT_FOUND, "Industry ID not found"
+                )
+            # Check if industry is active (false means active, true means inactive)
+            if industry.is_active:
+                return api_response(
+                    status.HTTP_400_BAD_REQUEST, "Industry is inactive"
+                )
+        # If it's a subcategory, ignore the industry_id parameter (no error, just ignore)
+
     updated = False
     final_slug = getattr(item, slug_field)
 
@@ -171,6 +191,11 @@ async def update_category_or_subcategory(
                 status.HTTP_400_BAD_REQUEST, f"Invalid {model_type} name."
             )
         setattr(item, name_field, name.upper())
+        updated = True
+
+    # Industry ID (only for categories)
+    if industry_id and industry_id.strip() and model_type == "category":
+        item.industry_id = industry_id.strip()
         updated = True
 
     # Slug
