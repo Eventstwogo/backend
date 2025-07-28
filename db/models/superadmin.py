@@ -228,48 +228,41 @@ class VendorSignup(Base):
     
 class VendorLogin(Base):
     __tablename__ = "ven_login"
-    sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement= True)
-    user_id: Mapped[str] = mapped_column(
-        String(length=6), unique=True
-    )
-    username: Mapped[str] = mapped_column(String, unique=False, nullable=False)
+
+    sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(length=6), unique=True)
+    username: Mapped[str] = mapped_column(String, nullable=False)
     username_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String, unique=True)
-
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    business_profile_id:Mapped[str]= mapped_column(String(length=6), unique=True)
-    user_profile_id: Mapped[str] = mapped_column(String(length=6), unique=True)
 
+    # Correct FK to BusinessProfile.ref_number
+    business_profile_id: Mapped[str] = mapped_column(
+        String(length=6),
+        ForeignKey("ven_businessprofile.ref_number"),
+        unique=True
+    )
+    user_profile_id: Mapped[str] = mapped_column(String(length=6), unique=True)
     login_attempts: Mapped[int] = mapped_column(Integer, default=0)
     login_failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
     login_status: Mapped[int] = mapped_column(Integer, default=0)
-    
-    # Account locking
-    locked_time: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), default=None
-    )
-    
-    # Last login tracking
-    last_login: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), default=None
-    )
-    
-    # Role and reference columns
-    role: Mapped[Optional[str]] = mapped_column(
-        ForeignKey("sa_roles.role_id"), nullable=True
-    )
+    locked_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), default=None)
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), default=None)
+    role: Mapped[Optional[str]] = mapped_column(ForeignKey("sa_roles.role_id"), nullable=True)
     vendor_ref_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="unknown")
-    
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    
-    # Relationship
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
     role_details: Mapped[Optional["Role"]] = relationship("Role", foreign_keys=[role])
+    business_profile: Mapped[Optional["BusinessProfile"]] = relationship(
+        "BusinessProfile",
+        back_populates="vendor_login",
+        uselist=False
+    )
 
 
 class BusinessProfile(Base):
@@ -278,11 +271,10 @@ class BusinessProfile(Base):
     sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     abn_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     abn_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    profile_ref_id: Mapped[str] = mapped_column(
-        String(length=6),
-        ForeignKey("ven_login.business_profile_id"),
-        unique=True
-    )
+
+    # This is not a FK anymore; use VendorLogin.business_profile_id
+    profile_ref_id: Mapped[str] = mapped_column(String(length=6), unique=True)
+
     profile_details: Mapped[dict] = mapped_column(JSONB, nullable=False)
     business_logo: Mapped[str] = mapped_column(String, nullable=True)
     payment_preference: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
@@ -293,22 +285,27 @@ class BusinessProfile(Base):
         ForeignKey("ven_industries.industry_id"),
         nullable=True
     )
+
     location: Mapped[str] = mapped_column(String, nullable=True)
-    ref_number: Mapped[str] = mapped_column(String(length=6), primary_key=True, unique=True)
+
+    # Keep this as unique (used in the relationship)
+    ref_number: Mapped[str] = mapped_column(String(length=6), unique=True)
+
     purpose: Mapped[dict] = mapped_column(JSONB, nullable=False)
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-
-    vendor_login: Mapped["VendorLogin"] = relationship(
+    # Relationships
+    vendor_login: Mapped[Optional["VendorLogin"]] = relationship(
         "VendorLogin",
         back_populates="business_profile",
-        uselist=False
+        uselist=False,
+        primaryjoin="BusinessProfile.ref_number==VendorLogin.business_profile_id"
     )
-
     industry_obj: Mapped["Industries"] = relationship(
         "Industries", back_populates="business_profiles", lazy="joined"
     )
+
 
 
 
