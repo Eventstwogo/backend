@@ -6,14 +6,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from fastapi import status
 from fastapi.responses import JSONResponse
-
+from utils.id_generators import hash_data
 from db.models.superadmin import AdminUser, PasswordReset
 from utils.auth import verify_password
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[AdminUser]:
     """Get user by email address."""
-    stmt = select(AdminUser).where(AdminUser.email == email.lower())
+    
+    # Hash the email for lookup since emails are stored encrypted
+    # and email_hash is used for searches
+    email_hash = hash_data(email.lower().strip())
+    stmt = select(AdminUser).where(AdminUser.email_hash == email_hash)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -56,8 +60,8 @@ async def validate_reset_token(
     if not user:
         return False, "Email address not found. Please check your email and try again.", None
     
-    # Check if account is active
-    if not user.is_active:
+    # Check if account is active (False = active, True = deactivated)
+    if user.is_active:
         return False, "Account is deactivated. Please contact support to reactivate your account.", None
     
     # Get the password reset record

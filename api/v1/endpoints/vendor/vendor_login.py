@@ -40,8 +40,12 @@ async def login_user(
     signup_result = await db.execute(signup_stmt)
     signup_user = signup_result.scalar_one_or_none()
     
+    # Check email verification status first
     if signup_user and not signup_user.email_flag:
-        raise HTTPException(status_code=403, detail="Please verify your email before logging in. Check your inbox for the verification link.")
+        raise HTTPException(
+            status_code=403, 
+            detail="Please verify your email address before logging in."
+        )
     
     # Find user by email in VendorLogin table
     stmt = select(VendorLogin).where(
@@ -51,7 +55,24 @@ async def login_user(
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(status_code=401, detail="Account not found")
+        # Check if user exists in signup table but hasn't verified email
+        if signup_user:
+            if not signup_user.email_flag:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Please verify your email first before logging in."
+                )
+            else:
+                raise HTTPException(
+                    status_code=500, 
+                    detail="Account verification incomplete. Please contact support."
+                )
+        else:
+            # User doesn't exist in either table
+            raise HTTPException(
+                status_code=404, 
+                detail="Account not found. Please register first."
+            )
 
     # Check if account is locked
     if user.login_status == 1:
@@ -82,7 +103,17 @@ async def login_user(
         raise HTTPException(status_code=403, detail="User is inactive")
 
     if not user.is_verified:
-       raise HTTPException(status_code=402, detail="Your business profile is under verification, check again later.")
+        # Get the business profile reference number for this user
+        profile_stmt = select(BusinessProfile.ref_number).where(
+            BusinessProfile.profile_ref_id == user.business_profile_id
+        )
+        profile_result = await db.execute(profile_stmt)
+        ref_number = profile_result.scalar_one_or_none() or "N/A"
+        
+        raise HTTPException(
+            status_code=402, 
+            detail=f"Your business profile is under verification, check again later. Reference number: {ref_number}"
+        )
 
     # Successful login - update login tracking
     user.login_attempts += 1  # Increment successful login attempts

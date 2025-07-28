@@ -148,8 +148,8 @@ class AdminUser(Base):
     username: Mapped[str] = mapped_column(
         String(500), nullable=False, unique=True
     )
-    email: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
-    email_hash: Mapped[str]= mapped_column(String(500), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    email_hash: Mapped[str]= mapped_column(String(255), unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
     profile_picture: Mapped[Optional[str]] = mapped_column(
         String(255), default=None
@@ -232,6 +232,8 @@ class VendorLogin(Base):
     user_id: Mapped[str] = mapped_column(
         String(length=6), unique=True
     )
+    username: Mapped[str] = mapped_column(String, unique=False, nullable=False)
+    username_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email_hash: Mapped[str]= mapped_column(String, unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String, unique= True)
@@ -259,11 +261,20 @@ class VendorLogin(Base):
         DateTime(timezone=True), default=None
     )
     
+    # Role and reference columns
+    role: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("sa_roles.role_id"), nullable=True
+    )
+    vendor_ref_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="unknown")
+    
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    
+    # Relationship
+    role_details: Mapped[Optional["Role"]] = relationship("Role", foreign_keys=[role])
 
 
 class BusinessProfile(Base):
