@@ -10,7 +10,7 @@ from starlette.responses import JSONResponse
 from utils.file_uploads import get_media_url
 from core.api_response import api_response
 from core.status_codes import APIResponse, StatusCode
-from db.models.superadmin import Category, Industries  
+from db.models.superadmin import Category, Industries, VendorLogin  
 from db.sessions.database import get_db
 from schemas.industry import CreateIndustry, IndustryDetails, IndustryUpdate
 from utils.exception_handlers import exception_handler
@@ -315,5 +315,102 @@ async def get_categories_by_industry(
     return api_response(
         status_code=status.HTTP_200_OK,
         message="Categories and subcategories fetched successfully",
+        data=data,
+    )
+
+
+
+
+@router.get("/by-vendor/{vendor_id}")
+@exception_handler
+async def get_categories_by_vendor(
+    vendor_id: str,
+    status_filter: Optional[bool] = Query(
+        None,
+        description="Filter by category/subcategory status: true, false, or omit for all",
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    # Step 1: Get Vendor -> Business Profile -> Industry ID
+    vendor_stmt = (
+        select(VendorLogin)
+        .options(selectinload(VendorLogin.business_profile))
+        .where(VendorLogin.user_id == vendor_id)
+    )
+
+    vendor_result = await db.execute(vendor_stmt)
+    vendor = vendor_result.scalars().first()
+
+    if not vendor or not vendor.business_profile:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Vendor or associated business profile not found",
+        )
+
+    industry_id = vendor.business_profile.industry
+
+    if not industry_id:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Industry not associated with vendor's business profile",
+        )
+
+    # Step 2: Fetch categories by industry_id
+    stmt = (
+        select(Category)
+        .where(Category.industry_id == industry_id)
+        .options(selectinload(Category.subcategories))
+    )
+
+    if status_filter is not None:
+        stmt = stmt.where(Category.category_status == status_filter)
+
+    result = await db.execute(stmt)
+    categories = result.scalars().unique().all()
+
+    data = []
+
+    for cat in categories:
+        # Filter subcategories if needed
+        subcats = [
+            s for s in cat.subcategories
+            if status_filter is None or s.subcategory_status == status_filter
+        ]
+
+        data.append(
+            {
+                "category_id": cat.category_id,
+                "category_name": cat.category_name.title(),
+                "category_description": cat.category_description,
+                "category_slug": cat.category_slug,
+                "category_meta_title": cat.category_meta_title,
+                "category_meta_description": cat.category_meta_description,
+                "category_img_thumbnail": get_media_url(cat.category_img_thumbnail),
+                "featured_category": cat.featured_category,
+                "show_in_menu": cat.show_in_menu,
+                "category_status": cat.category_status,
+                "has_subcategories": len(subcats) > 0,
+                "subcategory_count": len(subcats),
+                "subcategories": [
+                    {
+                        "subcategory_id": sub.subcategory_id,
+                        "subcategory_name": sub.subcategory_name.title(),
+                        "subcategory_description": sub.subcategory_description,
+                        "subcategory_slug": sub.subcategory_slug,
+                        "subcategory_meta_title": sub.subcategory_meta_title,
+                        "subcategory_meta_description": sub.subcategory_meta_description,
+                        "subcategory_img_thumbnail": get_media_url(sub.subcategory_img_thumbnail),
+                        "featured_subcategory": sub.featured_subcategory,
+                        "show_in_menu": sub.show_in_menu,
+                        "subcategory_status": sub.subcategory_status,
+                    }
+                    for sub in subcats
+                ],
+            }
+        )
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Categories and subcategories fetched successfully by vendor",
         data=data,
     )

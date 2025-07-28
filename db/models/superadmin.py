@@ -235,20 +235,15 @@ class VendorLogin(Base):
     username: Mapped[str] = mapped_column(String, unique=False, nullable=False)
     username_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    email_hash: Mapped[str]= mapped_column(String, unique=True, nullable=False)
-    password: Mapped[str] = mapped_column(String, unique= True)
-  
+    email_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    password: Mapped[str] = mapped_column(String, unique=True)
+
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    business_profile_id: Mapped[str] = mapped_column(
-        String(length=6), primary_key=True, unique=True
-    )
-    user_profile_id: Mapped[str] = mapped_column(
-        String(length=6), primary_key=True, unique=True
-    )
+    business_profile_id:Mapped[str]= mapped_column(String(length=6), unique=True)
+    user_profile_id: Mapped[str] = mapped_column(String(length=6), unique=True)
+
     login_attempts: Mapped[int] = mapped_column(Integer, default=0)
     login_failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
-    
-    # Login status: 0 (active), 1 (locked)
     login_status: Mapped[int] = mapped_column(Integer, default=0)
     
     # Account locking
@@ -282,23 +277,39 @@ class BusinessProfile(Base):
 
     sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     abn_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    abn_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False) 
+    abn_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     profile_ref_id: Mapped[str] = mapped_column(
-        String(length=6), primary_key=True, unique=True
+        String(length=6),
+        ForeignKey("ven_login.business_profile_id"),
+        unique=True
     )
     profile_details: Mapped[dict] = mapped_column(JSONB, nullable=False)
     business_logo: Mapped[str] = mapped_column(String, nullable=True)
     payment_preference: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
     store_name: Mapped[str] = mapped_column(String, nullable=True)
     store_url: Mapped[str] = mapped_column(String, nullable=True)
-    industry: Mapped[str] = mapped_column(String, nullable=True)
-    location: Mapped[str] = mapped_column(String, nullable=True)
-    ref_number: Mapped[str] = mapped_column(
-        String(length=6), primary_key=True, unique=True
+    industry: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("ven_industries.industry_id"),
+        nullable=True
     )
+    location: Mapped[str] = mapped_column(String, nullable=True)
+    ref_number: Mapped[str] = mapped_column(String(length=6), primary_key=True, unique=True)
     purpose: Mapped[dict] = mapped_column(JSONB, nullable=False)
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+    vendor_login: Mapped["VendorLogin"] = relationship(
+        "VendorLogin",
+        back_populates="business_profile",
+        uselist=False
+    )
+
+    industry_obj: Mapped["Industries"] = relationship(
+        "Industries", back_populates="business_profiles", lazy="joined"
+    )
+
 
 
 class Industries(Base):
@@ -312,6 +323,10 @@ class Industries(Base):
     industry_slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    business_profiles: Mapped[list["BusinessProfile"]] = relationship(
+        "BusinessProfile", back_populates="industry_obj"
+    )
 
 
 class VendorCategoryManagement(Base):

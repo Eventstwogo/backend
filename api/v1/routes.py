@@ -16,8 +16,8 @@ from api.v1.endpoints import (
 )
 
 
-from api.v1.endpoints.vendor import vendor_signup, email_verification, business_profile, vendor_login, vendor_onboarding, employee
-from api.v1.endpoints.admin import registration, admin_login, password_manager, product, admin_users
+from api.v1.endpoints.vendor import vendor_signup, email_verification, business_profile, vendor_login, vendor_onboarding, fetch_vendors, employee
+from api.v1.endpoints.admin import registration, admin_login, password_manager, product, vendor_approval, admin_users
 from api.v1.endpoints.vendor import vendor_category_mapping
 
 
@@ -88,11 +88,12 @@ api_router.include_router(
 )
 
 api_router.include_router(
-    vendor_login.router, prefix="/vendor", tags=["Vendor"]
-)
-api_router.include_router(
     email_verification.router, prefix="/vendor", tags=["Vendor"]
 )
+api_router.include_router(
+    vendor_login.router, prefix="/vendor", tags=["Vendor"]
+)
+
 
 api_router.include_router(
     business_profile.router, prefix="/vendor", tags=["Vendor"]
@@ -102,10 +103,13 @@ api_router.include_router(
     vendor_onboarding.router, prefix="/vendor", tags=["Vendor"]
 )
 
+
 api_router.include_router(
     employee.router, prefix="/vendor/employee", tags=["Vendor Employee"]
 )
 
+
+api_router.include_router(fetch_vendors.router, prefix="/vendor",tags=["Vendor"] )
 
 
 # Admin User Endpoints
@@ -118,6 +122,11 @@ api_router.include_router(
 api_router.include_router(
     password_manager.router, prefix="/admin", tags= ["Admin Password Management"]
 )
+
+api_router.include_router(
+    vendor_approval.router, prefix="/admin", tags= ["Admin Vendor Management"]
+)
+
 api_router.include_router(
     admin_users.router, prefix="/admin-users", tags=["Admin Users Management"]
 )
