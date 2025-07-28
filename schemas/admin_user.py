@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 from typing import List, Optional
 
 from fastapi import Form
@@ -209,4 +210,39 @@ class ResetPasswordWithToken(BaseModel):
     def validate_password(cls, v):
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters long.")
-        return v    
+        if len(v) > 12:
+            raise ValueError("Password must be at most 12 characters long.")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must include at least one uppercase letter.")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must include at least one lowercase letter.")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must include at least one digit.")
+        if not re.search(r"[^\w\s]", v):
+            raise ValueError("Password must include at least one special character.")
+        return v
+
+
+class ChangeInitialPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=8, description="New password (minimum 8 characters)")
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if len(v) > 12:
+            raise ValueError("Password must be at most 12 characters long.")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must include at least one uppercase letter.")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must include at least one lowercase letter.")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must include at least one digit.")
+        if not re.search(r"[^\w\s]", v):
+            raise ValueError("Password must include at least one special character.")
+        return v
+
+
+class ChangeInitialPasswordResponse(BaseModel):
+    message: str

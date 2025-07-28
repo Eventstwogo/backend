@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Shoppersky Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #555;
+            margin-bottom: 30px;
+        }
+        
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #8e44ad;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 5px;
+        }
+        
+        .info-box h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .info-value {
+            color: #6c757d;
+            word-break: break-all;
+        }
+        
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            transition: transform 0.2s ease;
+            margin: 20px 0;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .security-notice {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 25px 0;
+        }
+        
+        .security-notice h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .security-notice p {
+            color: #856404;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .admin-privileges {
+            background-color: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 25px 0;
+        }
+        
+        .admin-privileges h4 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+        
+        .admin-privileges p {
+            color: #155724;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .footer {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .footer p {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .footer .company-info {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 20px;
+        }
+        
+        .admin-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .role-badge {
+            display: inline-block;
+            background-color: #8e44ad;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin: 10px 0;
+        }
+        
+        .quick-links {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        
+        .quick-links h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .link-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+            text-decoration: none;
+            color: #555;
+            transition: background-color 0.2s ease;
+        }
+        
+        .link-item:hover {
+            background-color: #e9ecef;
+        }
+        
+        .link-icon {
+            margin-right: 15px;
+            font-size: 18px;
+        }
+        
+        .link-text {
+            font-size: 14px;
+        }
+        
+        @media (max-width: 600px) {
+            .email-container {
+                margin: 10px;
+                border-radius: 5px;
+            }
+            
+            .content {
+                padding: 25px 20px;
+            }
+            
+            .header {
+                padding: 25px 15px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .info-item {
+                flex-direction: column;
+                gap: 5px;
+            }
+            
+            .button {
+                display: block;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="admin-icon">👑</div>
+            <h1>Welcome to Admin Panel</h1>
+            <p>Your administrator account has been created</p>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">Hello {{ username }}!</div>
+            
+            <div class="message">
+                <p>Welcome to the Shoppersky Admin Panel! Your administrator account has been successfully created. You now have access to manage the platform and oversee all operations.</p>
+            </div>
+            
+            <div class="role-badge">{{ role|upper }} ADMINISTRATOR</div>
+            
+            <div class="info-box">
+                <h3>🔐 Your Admin Credentials</h3>
+                <div class="info-item">
+                    <span class="info-label">Email:</span>
+                    <span class="info-value">{{ email }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Temporary Password:</span>
+                    <span class="info-value">{{ password }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Role:</span>
+                    <span class="info-value">{{ role }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Admin Panel URL:</span>
+                    <span class="info-value">{{ admin_panel_url }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Account Created:</span>
+                    <span class="info-value">{{ creation_date }}</span>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{ admin_panel_url }}" class="button">Access Admin Panel</a>
+            </div>
+            
+            <div class="admin-privileges">
+                <h4>🛡️ Administrator Privileges</h4>
+                <p>• Full access to user management and vendor approvals</p>
+                <p>• Product catalog management and category administration</p>
+                <p>• Order management and transaction oversight</p>
+                <p>• System configuration and settings management</p>
+                <p>• Analytics dashboard and reporting tools</p>
+                <p>• Security settings and audit logs access</p>
+            </div>
+            
+            <div class="quick-links">
+                <h3>🚀 Quick Start Links</h3>
+                <a href="{{ admin_panel_url }}/dashboard" class="link-item">
+                    <span class="link-icon">📊</span>
+                    <span class="link-text">Admin Dashboard - Overview of platform metrics</span>
+                </a>
+                <a href="{{ admin_panel_url }}/users" class="link-item">
+                    <span class="link-icon">👥</span>
+                    <span class="link-text">User Management - Manage customer accounts</span>
+                </a>
+                <a href="{{ admin_panel_url }}/vendors" class="link-item">
+                    <span class="link-icon">🏪</span>
+                    <span class="link-text">Vendor Management - Approve and manage vendors</span>
+                </a>
+                <a href="{{ admin_panel_url }}/products" class="link-item">
+                    <span class="link-icon">📦</span>
+                    <span class="link-text">Product Management - Catalog administration</span>
+                </a>
+                <a href="{{ admin_panel_url }}/orders" class="link-item">
+                    <span class="link-icon">🛒</span>
+                    <span class="link-text">Order Management - Track and manage orders</span>
+                </a>
+                <a href="{{ admin_panel_url }}/settings" class="link-item">
+                    <span class="link-icon">⚙️</span>
+                    <span class="link-text">System Settings - Configure platform settings</span>
+                </a>
+            </div>
+            
+            <div class="security-notice">
+                <h4>🔒 Important Security Guidelines</h4>
+                <p>• Change your temporary password immediately after first login</p>
+                <p>• Use a strong, unique password with special characters</p>
+                <p>• Enable two-factor authentication if available</p>
+                <p>• Never share your admin credentials with anyone</p>
+                <p>• Log out completely when finished using the admin panel</p>
+                <p>• Report any suspicious activity immediately</p>
+            </div>
+            
+            <div class="message">
+                <p>As an administrator, you have significant responsibilities. Please familiarize yourself with the platform and reach out to our technical team if you need any assistance or training.</p>
+                
+                <p><strong>Support Contact:</strong> If you need help or have questions, please contact our technical support team.</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Shoppersky Team</strong></p>
+            <p>Empowering administrators to manage excellence</p>
+            <div class="company-info">
+                <p>&copy; {{ current_year }} Shoppersky. All rights reserved.</p>
+                <p>This email contains sensitive information. Please handle with care.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

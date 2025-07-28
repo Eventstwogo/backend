@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Shoppersky Vendor Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #555;
+            margin-bottom: 30px;
+        }
+        
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #f39c12;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 5px;
+        }
+        
+        .info-box h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .info-value {
+            color: #6c757d;
+            word-break: break-all;
+        }
+        
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            transition: transform 0.2s ease;
+            margin: 20px 0;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            background-color: #f39c12;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin: 10px 0;
+        }
+        
+        .onboarding-steps {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        
+        .onboarding-steps h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 5px;
+            border-left: 4px solid #f39c12;
+        }
+        
+        .step-number {
+            background-color: #f39c12;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .step-content {
+            flex: 1;
+        }
+        
+        .step-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .step-description {
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .benefits-box {
+            background-color: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 25px 0;
+        }
+        
+        .benefits-box h4 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+        
+        .benefits-box p {
+            color: #155724;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .footer {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .footer p {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .footer .company-info {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 20px;
+        }
+        
+        .vendor-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .contact-info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 25px 0;
+        }
+        
+        .contact-info h4 {
+            color: #0c5460;
+            margin-bottom: 10px;
+        }
+        
+        .contact-info p {
+            color: #0c5460;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        @media (max-width: 600px) {
+            .email-container {
+                margin: 10px;
+                border-radius: 5px;
+            }
+            
+            .content {
+                padding: 25px 20px;
+            }
+            
+            .header {
+                padding: 25px 15px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .info-item {
+                flex-direction: column;
+                gap: 5px;
+            }
+            
+            .button {
+                display: block;
+                text-align: center;
+            }
+            
+            .step {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .step-number {
+                margin-bottom: 10px;
+                margin-right: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="vendor-icon">🏪</div>
+            <h1>Welcome to Vendor Portal</h1>
+            <p>Your vendor account is ready to start selling</p>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">Hello {{ vendor_name }}!</div>
+            
+            <div class="message">
+                <p>Congratulations! Your vendor account has been successfully created and approved. You're now part of the Shoppersky marketplace and ready to start selling your products to thousands of customers.</p>
+            </div>
+            
+            <div class="status-badge">{{ status|upper }} VENDOR</div>
+            
+            <div class="info-box">
+                <h3>🏢 Your Vendor Account Details</h3>
+                <div class="info-item">
+                    <span class="info-label">Business Name:</span>
+                    <span class="info-value">{{ business_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Vendor Email:</span>
+                    <span class="info-value">{{ email }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Reference Number:</span>
+                    <span class="info-value" style="background-color: #fff3cd; padding: 8px 12px; border-radius: 5px; border: 2px solid #f39c12; font-weight: bold; color: #856404; font-size: 16px;">{{ reference_number }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Account Status:</span>
+                    <span class="info-value">{{ status }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Vendor Portal URL:</span>
+                    <span class="info-value">{{ vendor_portal_url }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Account Created:</span>
+                    <span class="info-value">{{ creation_date }}</span>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{ vendor_portal_url }}" class="button">Access Vendor Portal</a>
+            </div>
+            
+            <div class="onboarding-steps">
+                <h3>🚀 Getting Started - Next Steps</h3>
+                
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <div class="step-title">Complete Your Business Profile</div>
+                        <div class="step-description">Add your business description, logo, and contact information to build trust with customers.</div>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <div class="step-title">Set Up Payment & Shipping</div>
+                        <div class="step-description">Configure your payment methods and shipping options to start receiving orders.</div>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <div class="step-title">Add Your First Products</div>
+                        <div class="step-description">Upload product images, descriptions, and pricing to start selling immediately.</div>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <div class="step-title">Review Vendor Guidelines</div>
+                        <div class="step-description">Familiarize yourself with our policies, quality standards, and best practices.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="benefits-box">
+                <h4>🎯 Vendor Benefits & Features</h4>
+                <p>• Access to thousands of active customers on our platform</p>
+                <p>• Comprehensive analytics and sales reporting tools</p>
+                <p>• Integrated payment processing and automated payouts</p>
+                <p>• Marketing tools and promotional opportunities</p>
+                <p>• 24/7 vendor support and dedicated account management</p>
+                <p>• Mobile-friendly vendor dashboard for on-the-go management</p>
+            </div>
+            
+            <div class="contact-info">
+                <h4>📞 Vendor Support Contact</h4>
+                <p><strong>Email:</strong> vendor-support@shoppersky.com</p>
+                <p><strong>Phone:</strong> {{ support_phone|default("+1 (555) 123-4567") }}</p>
+                <p><strong>Support Hours:</strong> Monday - Friday, 9 AM - 6 PM EST</p>
+                <p><strong>Emergency Support:</strong> Available 24/7 for critical issues</p>
+            </div>
+            
+            <div class="message">
+                <p>We're excited to have you as a vendor partner! Our team is here to help you succeed on the platform. Don't hesitate to reach out if you need any assistance getting started.</p>
+                
+                <p><strong>Pro Tip:</strong> Vendors who complete their profile and add products within the first week typically see 3x higher sales in their first month!</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Shoppersky Vendor Relations Team</strong></p>
+            <p>Your success is our success</p>
+            <div class="company-info">
+                <p>&copy; {{ current_year }} Shoppersky. All rights reserved.</p>
+                <p>This email contains important vendor account information.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

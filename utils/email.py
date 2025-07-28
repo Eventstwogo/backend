@@ -118,7 +118,20 @@ def send_welcome_email(
     email: EmailStr, password: str, logo_url: str
 ) -> None:
     """Send a welcome email to a new user."""
-    body = f"""
+    # Use the new email service for better templates
+    try:
+        from services.email_service import email_service
+        username = email.split('@')[0]  # Extract username from email
+        success = email_service.send_welcome_email(
+            email=email,
+            username=username,
+            password=password
+        )
+        if not success:
+            logger.warning(f"Failed to send welcome email to {email}")
+    except ImportError:
+        # Fallback to old method if new service is not available
+        body = f"""
 Welcome to Shoppersky!
 
 Your account has been created successfully.
@@ -134,16 +147,100 @@ Best regards,
 Shoppersky Team
 
 © {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
-    """
+        """
 
-    success = email_sender.send_text_email(
-        to=email,
-        subject="Welcome to Shoppersky!",
-        body=body,
-    )
+        success = email_sender.send_text_email(
+            to=email,
+            subject="Welcome to Shoppersky!",
+            body=body,
+        )
 
-    if not success:
-        logger.warning(f"Failed to send welcome email to {email}")
+        if not success:
+            logger.warning(f"Failed to send welcome email to {email}")
+
+
+def send_admin_welcome_email(
+    email: EmailStr, username: str, password: str, role: str = "Admin"
+) -> bool:
+    """Send welcome email to new admin user using the new template"""
+    try:
+        from services.email_service import email_service
+        return email_service.send_admin_welcome_email(
+            email=email,
+            username=username,
+            password=password,
+            role=role
+        )
+    except ImportError:
+        # Fallback to basic email if new service is not available
+        body = f"""
+Welcome to Shoppersky Admin Panel!
+
+Your administrator account has been created successfully.
+
+Admin Details:
+- Email: {email}
+- Username: {username}
+- Password: {password}
+- Role: {role}
+- Admin Panel: {settings.FRONTEND_URL}/admin
+
+Please change your password after your first login for security.
+
+Best regards,
+Shoppersky Admin Team
+
+© {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
+        """
+        
+        success = email_sender.send_text_email(
+            to=email,
+            subject="Welcome to Shoppersky Admin Panel",
+            body=body,
+        )
+        return success
+
+
+def send_vendor_onboarding_email(
+    email: EmailStr, vendor_name: str, business_name: str, reference_number: str
+) -> bool:
+    """Send onboarding email to new vendor using the new template"""
+    try:
+        from services.email_service import email_service
+        return email_service.send_vendor_onboarding_email(
+            email=email,
+            vendor_name=vendor_name,
+            business_name=business_name,
+            reference_number=reference_number
+        )
+    except ImportError:
+        # Fallback to basic email if new service is not available
+        body = f"""
+Welcome to Shoppersky Vendor Portal!
+
+Your vendor account has been successfully created and approved.
+
+Vendor Details:
+- Business Name: {business_name}
+- Vendor Name: {vendor_name}
+- Vendor ID: {vendor_id}
+- Email: {email}
+- Vendor Portal: {settings.FRONTEND_URL}/vendor
+
+You can now start adding products and managing your store.
+
+Best regards,
+Shoppersky Vendor Team
+
+© {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
+        """
+        
+        success = email_sender.send_text_email(
+            to=email,
+            subject="Welcome to Shoppersky Vendor Portal",
+            body=body,
+        )
+        return success
 
 
 def send_admin_password_reset_email(
@@ -155,7 +252,19 @@ def send_admin_password_reset_email(
     request_time: str,
 ) -> bool:
     """Send a password reset email to an admin user."""
-    body = f"""
+    # Use the new email service for better templates
+    try:
+        from services.email_service import email_service
+        return email_service.send_password_reset_email(
+            email=email,
+            username=username,
+            reset_link=reset_link,
+            expiry_minutes=expiry_minutes,
+            ip_address=ip_address
+        )
+    except ImportError:
+        # Fallback to old method if new service is not available
+        body = f"""
 Hello {username},
 
 We received a request to reset your password for your Shoppersky admin account.
@@ -179,18 +288,11 @@ Best regards,
 Shoppersky Team
 
 © {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
-    """
-    
-    # For development, just log the email content
-    logger.info(f"Password reset email would be sent to {email}")
-    logger.info(f"Reset link: {reset_link}")
-    
-    # In production, uncomment this to actually send emails:
-    # success = email_sender.send_text_email(
-    #     to=email,
-    #     subject="Password Reset Request - Shoppersky Admin",
-    #     body=body,
-    # )
-    # return success
-    
-    return True  # Return True for development
+        """
+        
+        success = email_sender.send_text_email(
+            to=email,
+            subject="Password Reset Request - Shoppersky Admin",
+            body=body,
+        )
+        return success

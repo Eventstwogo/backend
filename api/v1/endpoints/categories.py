@@ -277,8 +277,8 @@ async def category_analytics(
     stats_query = await db.execute(
         select(
             func.count().label("total"),
-            func.count(case((Category.category_status, 1))).label("active"),
-            func.count(case((Category.category_status, 1))).label("inactive"),
+            func.count(case((Category.category_status.is_(False), 1))).label("active"),
+            func.count(case((Category.category_status.is_(True), 1))).label("inactive"),
             func.count(case((Category.featured_category.is_(True), 1))).label(
                 "featured"
             ),

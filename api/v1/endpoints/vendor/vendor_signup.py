@@ -8,8 +8,10 @@ from fastapi import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 from passlib.context import CryptContext
+from urllib.parse import quote
 
 from core.api_response import api_response
+from core.config import settings
 from db.models.superadmin import Config
 from db.models.superadmin import VendorSignup
 from db.sessions.database import get_db
@@ -20,7 +22,7 @@ from schemas.register import (
 
 from services.admin_user import get_config_or_404
 from services.vendor_user import validate_unique_user
-from utils.email import send_welcome_email
+from services.email_service import email_service
 from utils.file_uploads import (
     get_media_url,
 )
@@ -84,19 +86,23 @@ async def register_user(
     await db.commit()
     await db.refresh(new_user)
 
-    logo_url = get_media_url(config.logo_url or "") or ""
-
+    # Create verification link with both email and token (URL encoded)
+    verification_link = f"{settings.FRONTEND_URL}/vendor/verify?token={email_token}&email={quote(user_data.email)}"
+    
+    # Send vendor verification email instead of welcome email
     background_tasks.add_task(
-        send_welcome_email,
-        email=user_data.email,
-        
-        password=config.default_password,
-        logo_url=logo_url,
+        email_service.send_vendor_verification_email,
+        vendor_email=user_data.email,
+        vendor_name=user_data.email.split('@')[0],  # Use email prefix as vendor name for now
+        verification_token=email_token,
+        business_name="Your Business",  # You can modify this based on your vendor data
+        verification_link=verification_link,
+        expiry_minutes=30
     )
 
     return api_response(
         status_code=status.HTTP_201_CREATED,
-        message="User registered successfully. Welcome email sent in background.",
+        message="Vendor registered successfully. Verification email sent in background.",
         data=VendorRegisterResponse(
             signup_id=signup_id,
             email=user_data.email,

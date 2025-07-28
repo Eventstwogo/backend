@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Shoppersky!</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #555;
+            margin-bottom: 30px;
+        }
+        
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 5px;
+        }
+        
+        .info-box h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .info-value {
+            color: #6c757d;
+            word-break: break-all;
+        }
+        
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            transition: transform 0.2s ease;
+            margin: 20px 0;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .security-notice {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 25px 0;
+        }
+        
+        .security-notice h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .security-notice p {
+            color: #856404;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .footer {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .footer p {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .footer .company-info {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 20px;
+        }
+        
+        .welcome-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 600px) {
+            .email-container {
+                margin: 10px;
+                border-radius: 5px;
+            }
+            
+            .content {
+                padding: 25px 20px;
+            }
+            
+            .header {
+                padding: 25px 15px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .info-item {
+                flex-direction: column;
+                gap: 5px;
+            }
+            
+            .button {
+                display: block;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="welcome-icon">🎉</div>
+            <h1>Welcome to Shoppersky!</h1>
+            <p>Your account has been created successfully</p>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">Hello {{ username }}!</div>
+            
+            <div class="message">
+                <p>Welcome to Shoppersky! We're excited to have you join our community. Your account has been successfully created and you can now start exploring our platform.</p>
+            </div>
+            
+            <div class="info-box">
+                <h3>🔐 Your Login Details</h3>
+                <div class="info-item">
+                    <span class="info-label">Email:</span>
+                    <span class="info-value">{{ email }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Temporary Password:</span>
+                    <span class="info-value">{{ password }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Login URL:</span>
+                    <span class="info-value">{{ login_url }}</span>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{ login_url }}" class="button">Login to Your Account</a>
+            </div>
+            
+            <div class="security-notice">
+                <h4>🔒 Important Security Notice</h4>
+                <p>• Please change your password after your first login for security</p>
+                <p>• Keep your login credentials secure and don't share them with anyone</p>
+                <p>• If you didn't create this account, please contact our support team immediately</p>
+            </div>
+            
+            <div class="message">
+                <p>If you have any questions or need assistance, our support team is here to help. Welcome aboard!</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Shoppersky Team</strong></p>
+            <p>Your trusted e-commerce platform</p>
+            <div class="company-info">
+                <p>&copy; {{ current_year }} Shoppersky. All rights reserved.</p>
+                <p>This email was sent from an automated system. Please do not reply to this email.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
