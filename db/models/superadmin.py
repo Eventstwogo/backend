@@ -228,20 +228,17 @@ class VendorSignup(Base):
     
 class VendorLogin(Base):
     __tablename__ = "ven_login"
-
+ 
     sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String(length=6), unique=True)
     username: Mapped[str] = mapped_column(String, nullable=False)
-    username_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    username_hash: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String, unique=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-
-    # Correct FK to BusinessProfile.ref_number
     business_profile_id: Mapped[str] = mapped_column(
         String(length=6),
-        ForeignKey("ven_businessprofile.ref_number"),
         unique=True
     )
     user_profile_id: Mapped[str] = mapped_column(String(length=6), unique=True)
@@ -255,26 +252,33 @@ class VendorLogin(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
+ 
     # Relationships
     role_details: Mapped[Optional["Role"]] = relationship("Role", foreign_keys=[role])
+ 
     business_profile: Mapped[Optional["BusinessProfile"]] = relationship(
         "BusinessProfile",
         back_populates="vendor_login",
-        uselist=False
+        uselist=False,
+        primaryjoin="VendorLogin.business_profile_id == foreign(BusinessProfile.profile_ref_id)"
     )
-
-
+ 
+ 
+ 
+ 
 class BusinessProfile(Base):
     __tablename__ = "ven_businessprofile"
-
+ 
     sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     abn_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     abn_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-
-    # This is not a FK anymore; use VendorLogin.business_profile_id
-    profile_ref_id: Mapped[str] = mapped_column(String(length=6), unique=True)
-
+ 
+    profile_ref_id: Mapped[str] = mapped_column(
+        String(length=6),
+        ForeignKey("ven_login.business_profile_id"),
+        unique=True
+    )
+ 
     profile_details: Mapped[dict] = mapped_column(JSONB, nullable=False)
     business_logo: Mapped[str] = mapped_column(String, nullable=True)
     payment_preference: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
@@ -285,29 +289,28 @@ class BusinessProfile(Base):
         ForeignKey("ven_industries.industry_id"),
         nullable=True
     )
-
+ 
     location: Mapped[str] = mapped_column(String, nullable=True)
-
+ 
     # Keep this as unique (used in the relationship)
     ref_number: Mapped[str] = mapped_column(String(length=6), unique=True)
-
+ 
     purpose: Mapped[dict] = mapped_column(JSONB, nullable=False)
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    # Relationships
-    vendor_login: Mapped[Optional["VendorLogin"]] = relationship(
-        "VendorLogin",
-        back_populates="business_profile",
-        uselist=False,
-        primaryjoin="BusinessProfile.ref_number==VendorLogin.business_profile_id"
-    )
+ 
+ 
     industry_obj: Mapped["Industries"] = relationship(
         "Industries", back_populates="business_profiles", lazy="joined"
     )
-
-
-
+ 
+    vendor_login: Mapped["VendorLogin"] = relationship(
+        "VendorLogin",
+        back_populates="business_profile",
+        uselist=False
+    )
+ 
+ 
 
 class Industries(Base):
     __tablename__ = "ven_industries"

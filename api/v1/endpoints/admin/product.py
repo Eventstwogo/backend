@@ -3,6 +3,8 @@ import json
 from typing import Dict, List, Optional
 from psycopg2 import IntegrityError
 from slugify import slugify
+
+from utils.file_uploads import get_media_url, save_uploaded_file
 # from core.upload_files_to_space import upload_file_to_s3
 from sqlalchemy.orm import selectinload
 from utils.id_generators import generate_lowercase
@@ -19,6 +21,163 @@ UPLOAD_CATEGORY_FOLDER = "uploads/products"
 
 
 router = APIRouter()
+
+# @router.post("/create-product/", response_model=ProductResponse, status_code=201)
+# async def create_product(
+#     vendor_id: str = Form(...),
+#     cat_id: str = Form(...),
+#     subcat_id: Optional[str] = Form(default=None),
+#     identification: str = Form(...),
+#     descriptions: Optional[str] = Form(default=""),
+#     pricing: Optional[str] = Form(default=""),
+#     inventory: Optional[str] = Form(default=""),
+#     physical_attributes: Optional[str] = Form(default=""),
+#     files: List[UploadFile] = File(default=None),
+#     tags_and_relationships: Optional[str] = Form(default=""),
+#     status_flags: Optional[str] = Form(default=""),
+#     db: AsyncSession = Depends(get_db)
+# ):
+#     try:
+#         # Validate vendor
+#         result = await db.execute(select(VendorLogin).filter(VendorLogin.user_id == vendor_id))
+#         vendor_check = result.scalars().first()
+#         if not vendor_check:
+#             return APIResponse.response(StatusCode.NOT_FOUND, "Vendor not found", log_error=True)
+
+#         # Validate category
+#         result = await db.execute(select(Category).filter(Category.category_id == cat_id))
+#         category = result.scalars().first()
+#         if not category:
+#             return APIResponse.response(StatusCode.NOT_FOUND, "Category not found", log_error=True)
+
+#         # Validate subcategory and its relation to category
+#         if subcat_id:
+#             result = await db.execute(
+#                 select(SubCategory).filter(
+#                     SubCategory.subcategory_id == subcat_id,
+#                     SubCategory.category_id == cat_id
+#                 )
+#             )
+#             subcategory = result.scalars().first()
+#             if not subcategory:
+#                 return APIResponse.response(
+#                     StatusCode.NOT_FOUND,
+#                     "Subcategory not found or does not belong to the selected category",
+#                     log_error=True
+#                 )
+            
+#         #     # Check for existing product with same vendor_id, cat_id, and subcat_id
+#         # query = select(Product).filter(
+#         #     Product.vendor_id == vendor_id,
+#         #     Product.category_id == cat_id,
+#         #     Product.subcategory_id == subcat_id if subcat_id else Product.subcategory_id.is_(None)
+#         # )
+#         # result = await db.execute(query)
+#         # existing_product = result.scalars().first()
+#         # if existing_product:
+#         #     return APIResponse.response(
+#         #         StatusCode.BAD_REQUEST,
+#         #         "A product with this vendor, category, and subcategory already exists",
+#         #         log_error=True
+#         #     )
+
+#         # Parse JSON fields
+#         try:
+#             identification_data = json.loads(identification)
+#             descriptions_data = json.loads(descriptions) if descriptions else {}
+#             pricing_data = json.loads(pricing) if pricing else {}
+#             inventory_data = json.loads(inventory) if inventory else {}
+#             physical_attributes_data = json.loads(physical_attributes) if physical_attributes else {}
+#             tags_and_relationships_data = json.loads(tags_and_relationships) if tags_and_relationships else {}
+#             status_flags_data = json.loads(status_flags) if status_flags else {}
+#         except json.JSONDecodeError as e:
+#             return APIResponse.response(StatusCode.BAD_REQUEST, f"Invalid JSON data: {str(e)}", log_error=True)
+
+#         # Validate product name
+#         product_name = identification_data.get("product_name", "").strip()
+#         if not product_name:
+#             return APIResponse.response(StatusCode.BAD_REQUEST, "Product name is required", log_error=True)
+
+#         # Generate unique slug
+#         base_slug = slugify(product_name)
+#         slug = base_slug
+#         suffix = 0
+#         while True:
+#             result = await db.execute(select(Product).filter(Product.slug == slug))
+#             if not result.scalars().first():
+#                 break
+#             suffix += 1
+#             slug = f"{base_slug}-{suffix}"
+
+#         # Handle file uploads (commented out S3 upload for now)
+#         image_urls = []
+
+#         product_id = generate_lowercase(6)
+#         if files:
+#             for file in files:
+#                 timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+#                 cleaned_product_id = product_id.replace(" ", "_").lower()
+#                 new_filename = f"{timestamp}_{file.filename}"
+#                 file_path = f"products/{cleaned_product_id}/{new_filename}"
+#                 # image_url = await upload_file_to_s3(file, file_path)
+#                 # image_urls.append(image_url)
+
+#         # Create product
+#         db_product = Product(
+#             product_id=product_id,
+#             vendor_id=vendor_id,
+#             category_id=cat_id,
+#             subcategory_id=subcat_id if subcat_id else None,
+#             identification={
+#                 "product_name": product_name,
+#                 "product_sku": identification_data.get("product_sku", "")
+#             },
+#             descriptions={
+#                 "short_description": descriptions_data.get("short_description", ""),
+#                 "full_description": descriptions_data.get("full_description", "")
+#             } if descriptions_data else None,
+#             pricing={
+#                 "actual_price": pricing_data.get("actual_price", ""),
+#                 "selling_price": pricing_data.get("selling_price", "")
+#             } if pricing_data else None,
+#             inventory={
+#                 "quantity": inventory_data.get("stock_quantity", ""),
+#                 "stock_alert_status": inventory_data.get("stock_alert_status", "instock")
+#             } if inventory_data else None,
+#             physical_attributes={
+#                 "weight": physical_attributes_data.get("weight", ""),
+#                 "dimensions": physical_attributes_data.get("dimensions", {}),
+#                 "shipping_class": physical_attributes_data.get("shipping_class", "standard")
+#             } if physical_attributes_data else None,
+#             images={"urls": image_urls} if image_urls else None,
+#             tags_and_relationships={
+#                 "product_tags": tags_and_relationships_data.get("product_tags", []),
+#                 "linkedproductid": tags_and_relationships_data.get("linkedproductid", "")
+#             } if tags_and_relationships_data else None,
+#             status_flags={
+#                 "featured_product": status_flags_data.get("featured_product", False),
+#                 "published_product": status_flags_data.get("published_product", True),
+#                 "product_status": status_flags_data.get("product_status", False)
+#             } if status_flags_data else {
+#                 "featured_product": False,
+#                 "published_product": True,
+#                 "product_status": False
+#             },
+#             slug=slug
+#         )
+
+#         db.add(db_product)
+#         await db.commit()
+#         await db.refresh(db_product)
+#         return db_product
+
+#     except IntegrityError as e:
+#         await db.rollback()
+#         return APIResponse.response(StatusCode.BAD_REQUEST, f"Failed to create product: {str(e)}", log_error=True)
+#     except Exception as e:
+#         await db.rollback()
+#         return APIResponse.response(StatusCode.SERVER_ERROR, f"Unexpected error: {str(e)}", log_error=True)
+    
 
 @router.post("/create-product/", response_model=ProductResponse, status_code=201)
 async def create_product(
@@ -48,7 +207,8 @@ async def create_product(
         if not category:
             return APIResponse.response(StatusCode.NOT_FOUND, "Category not found", log_error=True)
 
-        # Validate subcategory and its relation to category
+        # Validate subcategory
+        subcategory = None
         if subcat_id:
             result = await db.execute(
                 select(SubCategory).filter(
@@ -63,21 +223,6 @@ async def create_product(
                     "Subcategory not found or does not belong to the selected category",
                     log_error=True
                 )
-            
-        #     # Check for existing product with same vendor_id, cat_id, and subcat_id
-        # query = select(Product).filter(
-        #     Product.vendor_id == vendor_id,
-        #     Product.category_id == cat_id,
-        #     Product.subcategory_id == subcat_id if subcat_id else Product.subcategory_id.is_(None)
-        # )
-        # result = await db.execute(query)
-        # existing_product = result.scalars().first()
-        # if existing_product:
-        #     return APIResponse.response(
-        #         StatusCode.BAD_REQUEST,
-        #         "A product with this vendor, category, and subcategory already exists",
-        #         log_error=True
-        #     )
 
         # Parse JSON fields
         try:
@@ -107,18 +252,17 @@ async def create_product(
             suffix += 1
             slug = f"{base_slug}-{suffix}"
 
-        # Handle file uploads (commented out S3 upload for now)
-        image_urls = []
-
+        # Generate product_id
         product_id = generate_lowercase(6)
+
+        # Save uploaded images
+        image_urls = []
         if files:
             for file in files:
-                timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-                cleaned_product_id = product_id.replace(" ", "_").lower()
-                new_filename = f"{timestamp}_{file.filename}"
-                file_path = f"products/{cleaned_product_id}/{new_filename}"
-                # image_url = await upload_file_to_s3(file, file_path)
-                # image_urls.append(image_url)
+                sub_path = f"products/{cat_id}/{slug}"
+                uploaded_url = await save_uploaded_file(file, sub_path)
+                if uploaded_url:
+                    image_urls.append(uploaded_url)
 
         # Create product
         db_product = Product(
@@ -167,7 +311,29 @@ async def create_product(
         db.add(db_product)
         await db.commit()
         await db.refresh(db_product)
-        return db_product
+
+        # Prepare response
+        category_name = category.category_name
+        subcategory_name = subcategory.subcategory_name if subcategory else None
+
+        response_data = ProductResponse(
+            product_id=db_product.product_id,
+            vendor_id=db_product.vendor_id,
+            slug=db_product.slug,
+            identification=db_product.identification,
+            descriptions=db_product.descriptions,
+            pricing=db_product.pricing,
+            inventory=db_product.inventory,
+            physical_attributes=db_product.physical_attributes,
+            images=db_product.images,
+            tags_and_relationships=db_product.tags_and_relationships,
+            status_flags=db_product.status_flags,
+            timestamp=db_product.timestamp,
+            category_name=category_name,
+            subcategory_name=subcategory_name
+        )
+
+        return response_data
 
     except IntegrityError as e:
         await db.rollback()
@@ -175,7 +341,7 @@ async def create_product(
     except Exception as e:
         await db.rollback()
         return APIResponse.response(StatusCode.SERVER_ERROR, f"Unexpected error: {str(e)}", log_error=True)
-    
+
 
 
 @router.get("/", response_model=List[ProductResponse], status_code=200)
@@ -318,6 +484,10 @@ async def get_products_by_vendor_id(
         # Map products into the correct response model
         response = []
         for product in products:
+            image_urls = []
+            if product.images and "urls" in product.images:
+                image_urls = [get_media_url(url) for url in product.images["urls"]]
+
             response.append(
                 ProductResponse(
                     product_id=product.product_id,
@@ -328,9 +498,10 @@ async def get_products_by_vendor_id(
                     pricing=product.pricing,
                     inventory=product.inventory,
                     physical_attributes=product.physical_attributes,
-                    images=product.images,
+                    
                     tags_and_relationships=product.tags_and_relationships,
                     status_flags=product.status_flags,
+                    images={"urls": image_urls} if image_urls else None,
                     timestamp=product.timestamp,
                     category_name=product.category.category_name if product.category else None,
                     subcategory_name=product.subcategory.subcategory_name if product.subcategory else None,

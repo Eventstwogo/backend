@@ -102,18 +102,18 @@ async def login_user(
     if user.is_active:
         raise HTTPException(status_code=403, detail="User is inactive")
 
-    if not user.is_verified:
-        # Get the business profile reference number for this user
-        profile_stmt = select(BusinessProfile.ref_number).where(
-            BusinessProfile.profile_ref_id == user.business_profile_id
-        )
-        profile_result = await db.execute(profile_stmt)
-        ref_number = profile_result.scalar_one_or_none() or "N/A"
+    # if not user.is_verified:
+    #     # Get the business profile reference number for this user
+    #     profile_stmt = select(BusinessProfile.ref_number).where(
+    #         BusinessProfile.profile_ref_id == user.business_profile_id
+    #     )
+    #     profile_result = await db.execute(profile_stmt)
+    #     ref_number = profile_result.scalar_one_or_none() or "N/A"
         
-        raise HTTPException(
-            status_code=402, 
-            detail=f"Your business profile is under verification, check again later. Reference number: {ref_number}"
-        )
+    #     raise HTTPException(
+    #         status_code=402, 
+    #         detail=f"Your business profile is under verification, check again later. Reference number: {ref_number}"
+    #     )
 
     # Successful login - update login tracking
     user.login_attempts += 1  # Increment successful login attempts

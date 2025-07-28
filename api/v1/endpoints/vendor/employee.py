@@ -432,56 +432,36 @@ async def restore_vendor_employee_by_id(
         data={"user_id": user_id}
     )
 
-
 @router.get("/")
 @exception_handler
 async def get_all_vendor_employees(
-    vendor_id: Optional[str] = Query(None, description="Filter by vendor ID"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
-    role_id: Optional[str] = Query(None, description="Filter by role ID"),
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(10, ge=1, le=100, description="Items per page"),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Get all vendor employees with optional filters and pagination"""
-    
+    """Get all vendor employees (excluding vendors) with pagination"""
+   
     # Build base query with join to get role names
+    # Only get employees (vendor_ref_id is not "unknown") - skip vendors (vendor_ref_id is "unknown")
     base_query = select(VendorLogin, Role.role_name).outerjoin(
         Role, VendorLogin.role == Role.role_id
-    )
-    
-    # Apply filters
-    filters = []
-    
-    if vendor_id:
-        filters.append(VendorLogin.vendor_ref_id == vendor_id)
-    
-    if is_active is not None:
-        filters.append(VendorLogin.is_active == is_active)
-    
-    if role_id:
-        filters.append(VendorLogin.role == role_id)
-    
-    if filters:
-        base_query = base_query.where(and_(*filters))
-    
-    # Get total count
-    count_query = select(func.count(VendorLogin.user_id))
-    if filters:
-        count_query = count_query.where(and_(*filters))
-    
+    ).where(VendorLogin.vendor_ref_id != "unknown")
+   
+    # Get total count for employees only
+    count_query = select(func.count(VendorLogin.user_id)).where(VendorLogin.vendor_ref_id != "unknown")
+   
     total_result = await db.execute(count_query)
     total = total_result.scalar()
-    
+   
     # Calculate pagination
     total_pages = math.ceil(total / per_page)
     offset = (page - 1) * per_page
-    
+   
     # Get paginated results
     query = base_query.offset(offset).limit(per_page).order_by(VendorLogin.created_at.desc())
     result = await db.execute(query)
     employees_data = result.all()
-    
+   
     # Format response
     employees = []
     for employee, role_name in employees_data:
@@ -489,10 +469,10 @@ async def get_all_vendor_employees(
             decrypted_email = decrypt_data(employee.email)
         except Exception:
             decrypted_email = "encrypted_email"
-        
+       
         # Decrypt username for response
         decrypted_username = safe_decrypt_username(employee.username)
-        
+       
         employees.append({
             "user_id": employee.user_id,
             "username": decrypted_username,
@@ -501,7 +481,7 @@ async def get_all_vendor_employees(
             "role_name": role_name,
             "vendor_ref_id": employee.vendor_ref_id
         })
-    
+   
     return api_response(
         status_code=status.HTTP_200_OK,
         message="Employees retrieved successfully",
