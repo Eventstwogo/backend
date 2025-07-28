@@ -308,6 +308,7 @@ async def get_category_by_slug(
 
     data = {
         "category_id": category.category_id,
+        "industry_id": category.industry_id,
         "category_name": category.category_name.title(),
         "category_description": category.category_description,
         "category_slug": category.category_slug,

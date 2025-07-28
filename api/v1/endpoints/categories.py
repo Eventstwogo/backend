@@ -239,6 +239,7 @@ async def get_all_categories(
         data.append(
             {
                 "category_id": cat.category_id,
+                "industry_id": cat.industry_id,
                 "category_name": cat.category_name.title(),
                 "category_description": cat.category_description,
                 "category_slug": cat.category_slug,

@@ -32,6 +32,7 @@ from services.password_reset import (
     account_deactivated,
     account_not_found
 )
+from utils.id_generators import decrypt_data
 
 router = APIRouter()
 
@@ -180,8 +181,8 @@ async def forgot_password(
     if not user:
         return user_not_found_response()
 
-    # Step 3: Check if user is active (False = active in your logic)
-    if not user.is_active:  # False means account is deactivated
+    # Step 3: Check if user is active (False = active, True = deactivated)
+    if user.is_active:  # True means account is deactivated
         return account_deactivated()
 
     # Step 4: Generate a secure 32-character reset token with 1 hour expiration
@@ -201,9 +202,12 @@ async def forgot_password(
     reset_link = f"{settings.FRONTEND_URL}/reset-password?email={email}&token={reset_token}"
 
     # Step 7: Send the password reset email
+    # Use the plain text email from the form input and decrypt the username
+    decrypted_username = decrypt_data(user.username)
+    
     send_admin_password_reset_email(
-        email=user.email,
-        username=user.username,
+        email=email,  # Use plain text email from form
+        username=decrypted_username,  # Decrypt the username
         reset_link=reset_link,
         expiry_minutes=60,  # 1 hour expiry
         ip_address=ip_address,

@@ -100,6 +100,7 @@ class AdminRegisterResponse(BaseModel):
     user_id: str
     email: EmailStr
     username: str
+    password: str
 
 
 class AdminUser(BaseModel):

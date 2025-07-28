@@ -32,22 +32,24 @@ async def login_user(
     if not user:
         raise HTTPException(status_code=404, detail="Account not found")
     
-    # Check if account is locked
-    if user.login_status == 1:
-        raise HTTPException(status_code=423, detail="Account is locked. Try after 24 hours.")
-    
-
     # Compare password
     if not pwd_context.verify(login_data.password, user.password):
         user.login_attempts += 1
         await db.commit()
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Incorrect password")
+    
+    # Check if account is locked
+    if user.login_status == 1:
+        raise HTTPException(status_code=423, detail="Account is locked. Try after 24 hours.")
+    
+    if user.login_status == -1:
+        raise HTTPException(status_code=403, detail="Initial login detected. Please change your password.")
 
     if user.is_active:
         raise HTTPException(status_code=403, detail="Account is not active")
 
     # Reset attempts, update login time, set to active
-    user.login_attempts = 0
+    user.login_attempts = user.login_attempts + 1 if user.login_attempts is not None else 0
     user.login_status = 0  # Set to active
     user.last_login = datetime.utcnow()
     await db.commit()

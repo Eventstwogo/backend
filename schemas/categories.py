@@ -23,6 +23,7 @@ class SubCategoryOut(BaseModel):
 
 class CategoryOut(BaseModel):
     category_id: str
+    industry_id: str
     category_name: str
     category_description: Optional[str]
     category_slug: str

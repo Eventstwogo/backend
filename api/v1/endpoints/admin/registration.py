@@ -16,7 +16,7 @@ from services.admin_user import (
     validate_superadmin_uniqueness,
     validate_unique_user,
 )
-from utils.email import send_welcome_email
+from services.admin_password_service import generate_and_send_admin_credentials
 from utils.exception_handlers import exception_handler
 from utils.file_uploads import get_media_url
 from utils.id_generators import encrypt_data, generate_lower_uppercase, hash_data
@@ -83,10 +83,24 @@ async def register_user(
 
     config = config_result
 
-    # Generate unique user ID and use default password for new admins
+    # Generate unique user ID and random password for new admin
     user_id = generate_lower_uppercase(length=6)
-    plain_password = config.default_password  # Use default password from config
-    hashed_password = config.default_password_hash  # Use pre-hashed default password
+    logo_url = get_media_url(config.logo_url or "") or ""
+    
+    # Generate random password and send credentials via email
+    plain_password, hashed_password, email_sent = generate_and_send_admin_credentials(
+        email=user_data.email,
+        username=user_data.username,
+        logo_url=logo_url
+    )
+    
+    # Check if password generation was successful
+    if not hashed_password:
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to generate admin password. Please try again.",
+            log_error=True,
+        )
 
     # Create new user
     new_user = AdminUser(
@@ -96,6 +110,7 @@ async def register_user(
         email=encrypted_email,
         email_hash=email_hash,
         password=hashed_password,
+        login_status=-1,  # Default to -1 (not logged in)
         days_180_flag=config.global_180_day_flag,
     )
 
@@ -104,24 +119,17 @@ async def register_user(
     await db.commit()
     await db.refresh(new_user)
 
-    # Send welcome email in background
-    logo_url = get_media_url(config.logo_url or "") or ""
-
-    background_tasks.add_task(
-        send_welcome_email,
-        email=user_data.email,
-        username=user_data.username,
-        password=plain_password,  # Send the plain password in email
-        logo_url=logo_url,
-    )
-
-    # Return success response
+    # Return success response with email status
+    email_status = "Credentials email sent successfully." if email_sent else "User created but email sending failed."
+    message = f"User registered successfully. {email_status}"
+    
     return api_response(
         status_code=status.HTTP_201_CREATED,
-        message="User registered successfully. Welcome email sent in background.",
+        message=message,
         data=AdminRegisterResponse(
             user_id=user_id,
             email=user_data.email,
             username=user_data.username,
+            password=plain_password,
         ),
     )
