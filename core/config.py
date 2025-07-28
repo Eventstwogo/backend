@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: Literal["development", "testing", "production"] = "development"
-    APP_HOST: str = "0.0.0.0"  # nosec B104
+    APP_HOST: str = "127.0.0.1"  # nosec B104
     APP_PORT: int = 8000
     LOG_LEVEL: str = "info"
     DEBUG: bool = True
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     POSTGRES_DRIVER: str = "asyncpg"
     POSTGRES_SCHEME: str = "postgresql"
     POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5433
+    POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "shoppersky"

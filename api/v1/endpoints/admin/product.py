@@ -342,12 +342,13 @@ async def create_product(
         await db.rollback()
         return APIResponse.response(StatusCode.SERVER_ERROR, f"Unexpected error: {str(e)}", log_error=True)
 
-
-
 @router.get("/", response_model=List[ProductResponse], status_code=200)
 async def get_all_products(db: AsyncSession = Depends(get_db)):
     try:
-        result = await db.execute(select(Product))
+        result = await db.execute(select(Product).options(
+            selectinload(Product.category),
+            selectinload(Product.subcategory)
+        ))
         products = result.scalars().all()
 
         if not products:
@@ -356,7 +357,26 @@ async def get_all_products(db: AsyncSession = Depends(get_db)):
                 "No products found",
                 log_error=False,
             )
-        return products
+
+        # Convert ORM objects to response-ready dicts
+        product_responses = []
+        for product in products:
+            product_data = product.__dict__.copy()
+            
+            # Remove internal SQLAlchemy state
+            product_data.pop("_sa_instance_state", None)
+
+            product_data["category_name"] = (
+                product.category.category_name if product.category else None
+            )
+            product_data["subcategory_name"] = (
+                product.subcategory.subcategory_name if product.subcategory else None
+            )
+
+            product_responses.append(ProductResponse(**product_data))
+
+        return product_responses
+
     except Exception as e:
         return APIResponse.response(
             StatusCode.SERVER_ERROR,
