@@ -2,6 +2,7 @@
 import json
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Body,
     Depends,
     HTTPException,
@@ -11,9 +12,10 @@ from starlette.responses import JSONResponse
 from sqlalchemy import select
 
 from schemas.vendor_onboarding import OnboardingRequest
-from utils.id_generators import encrypt_data, encrypt_dict_values, generate_digits_letters, hash_data
+from utils.id_generators import encrypt_data, encrypt_dict_values, generate_digits_letters, hash_data, decrypt_data
 from db.models.superadmin import BusinessProfile, VendorLogin, Industries
 from services.business_profile import fetch_abn_details, validate_abn_id
+from services.email_service import email_service
 from db.sessions.database import get_db
 
 
@@ -36,6 +38,7 @@ async def verify_abn(abn_id: str):
 
 @router.post("/onboarding")
 async def vendor_onboarding(
+    background_tasks: BackgroundTasks,
     data: OnboardingRequest,
     abn_id: str = Depends(validate_abn_id),
     db: AsyncSession = Depends(get_db)
@@ -146,10 +149,29 @@ async def vendor_onboarding(
         await db.commit()
         await db.refresh(new_profile)
 
+        # Get vendor email for sending onboarding confirmation email
+        try:
+            vendor_email = decrypt_data(existing_profile.email)
+            business_name = store_name_cleaned
+            vendor_name = business_name  # Using business name as vendor name
+            
+            # Send onboarding confirmation email with reference number
+            background_tasks.add_task(
+                email_service.send_vendor_onboarding_email,
+                email=vendor_email,
+                vendor_name=vendor_name,
+                business_name=business_name,
+                reference_number=ref_number,  # Using reference number
+                status="Active"
+            )
+        except Exception as email_error:
+            # Log the error but don't fail the onboarding process
+            print(f"Warning: Failed to send onboarding email: {str(email_error)}")
+
         return JSONResponse(
             status_code=201,
             content={
-                "message": "Vendor onboarding completed successfully",
+                "message": "Vendor onboarding completed successfully. Confirmation email sent.",
                 "reference_number": ref_number,
                 "profile_ref_id": data.profile_ref_id,
                 "store_url": str(data.store_url)

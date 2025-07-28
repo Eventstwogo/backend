@@ -7,14 +7,27 @@ from fastapi import HTTPException
 
 
 def validate_password(Id_password: str):
-        if 8 <= len(Id_password) <= 12:
-            if any(c.islower() for c in Id_password) and \
-                any(c.isupper() for c in Id_password) and \
-                any(c.isdigit() for c in Id_password) and \
-                any(c in '!@#$%^&*()-_=+[]{}|;:,.<>?/~`' for c in Id_password):
-                return {"status_code": 200, "message": "Password is valid."}
-            return {"status_code": 400, "message": "Password must contain atleast one Uppercase, one Lowercase, one Digit, one Special Character."}
+    # Check length first
+    if not (8 <= len(Id_password) <= 12):
         return {"status_code": 400, "message": "Password length must be between 8 and 12 characters."}
+    
+    # Check for lowercase letter
+    if not any(c.islower() for c in Id_password):
+        return {"status_code": 400, "message": "Password must contain at least one lowercase letter."}
+    
+    # Check for uppercase letter
+    if not any(c.isupper() for c in Id_password):
+        return {"status_code": 400, "message": "Password must contain at least one uppercase letter."}
+    
+    # Check for digit
+    if not any(c.isdigit() for c in Id_password):
+        return {"status_code": 400, "message": "Password must contain at least one digit."}
+    
+    # Check for special character
+    if not any(c in '!@#$%^&*()-_=+[]{}|;:,.<>?/~`' for c in Id_password):
+        return {"status_code": 400, "message": "Password must contain at least one special character (!@#$%^&*()-_=+[]{}|;:,.<>?/~`)."}
+    
+    return {"status_code": 200, "message": "Password is valid."}
 
 
 def validate_name(input_name: str, field_name: str) -> str:

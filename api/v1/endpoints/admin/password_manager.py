@@ -19,7 +19,9 @@ from schemas.admin_user import (
     UpdatePasswordBody, 
     UpdatePasswordResponse,
     ForgotPassword,
-    ResetPasswordWithToken
+    ResetPasswordWithToken,
+    ChangeInitialPasswordRequest,
+    ChangeInitialPasswordResponse
 )
 from db.sessions.database import get_db
 from services.password_reset import (
@@ -55,6 +57,11 @@ async def update_password(
     # Verify old password
     if not pwd_context.verify(body.old_password, user.password):
         raise HTTPException(status_code=401, detail="Old password is incorrect.")
+
+    # Validate new password format
+    validation_result = validate_password(body.new_password)
+    if validation_result["status_code"] != 200:
+        raise HTTPException(status_code=400, detail=validation_result["message"])
 
     # Check if new password is same as old password
     if pwd_context.verify(body.new_password, user.password):
@@ -251,19 +258,27 @@ async def reset_password_with_token(
             message=error_message or "Invalid or expired reset token.",
         )
 
-    # Step 2: Prevent using the same password
+    # Step 2: Validate new password format
+    validation_result = validate_password(new_password)
+    if validation_result["status_code"] != 200:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=validation_result["message"],
+        )
+
+    # Step 3: Prevent using the same password
     if verify_password(new_password, user.password):
         return api_response(
             status_code=status.HTTP_409_CONFLICT,
             message="New password cannot be the same as old password.",
         )
 
-    # Step 3: Update the password
+    # Step 4: Update the password
     user.password = hash_password(new_password)
     user.login_status = 0  # Normal login status
     user.login_attempts = 0  # Reset login attempts
 
-    # Step 4: Mark the reset token as used
+    # Step 5: Mark the reset token as used
     await mark_password_reset_used(db=db, user_id=user.user_id)
 
     await db.commit()
@@ -272,4 +287,62 @@ async def reset_password_with_token(
     return api_response(
         status_code=status.HTTP_200_OK,
         message="Password has been reset successfully.",
+    )
+
+
+@router.post("/change-initial-password", response_model=ChangeInitialPasswordResponse)
+@exception_handler
+async def change_initial_password(
+    password_data: ChangeInitialPasswordRequest,
+    email: str = Query(..., description="User email address"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Change initial password for a user by email"""
+    
+    # Normalize email
+    email = email.strip().lower()
+    
+    # Step 1: Check if user exists
+    user = await get_user_by_email(db, email)
+    if not user:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="User with this email address not found.",
+        )
+    
+    # Step 2: Check if user account is active (False = active, True = deactivated)
+    if user.is_active:  # True means account is deactivated
+        return api_response(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Account is deactivated. Cannot change password.",
+        )
+    
+    # Step 3: Validate new password format
+    validation_result = validate_password(password_data.new_password)
+    if validation_result["status_code"] != 200:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=validation_result["message"],
+        )
+    
+    # Step 4: Prevent using the same password as current password
+    if verify_password(password_data.new_password, user.password):
+        return api_response(
+            status_code=status.HTTP_409_CONFLICT,
+            message="New password cannot be the same as current password.",
+        )
+    
+    # Step 5: Update the password
+    user.password = hash_password(password_data.new_password)
+    user.login_status = 0  # Normal login status
+    user.login_attempts = 0  # Reset login attempts
+    user.updated_at = datetime.now(timezone.utc)
+    user.days_180_timestamp = datetime.now(timezone.utc)
+    
+    await db.commit()
+    await db.refresh(user)
+    
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Initial password has been changed successfully.",
     )

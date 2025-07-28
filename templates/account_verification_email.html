@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Account</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #555;
+            margin-bottom: 30px;
+        }
+        
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #27ae60;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 5px;
+        }
+        
+        .info-box h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            transition: transform 0.2s ease;
+            margin: 20px 0;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .verification-code {
+            background-color: #e8f5e8;
+            border: 2px dashed #27ae60;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin: 25px 0;
+        }
+        
+        .verification-code h3 {
+            color: #27ae60;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .verification-code .code {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2c3e50;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+            background-color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        
+        .expiry-warning {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .expiry-warning h4 {
+            color: #0c5460;
+            margin-bottom: 10px;
+        }
+        
+        .expiry-warning p {
+            color: #0c5460;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .footer {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .footer p {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .footer .company-info {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 20px;
+        }
+        
+        .verify-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .steps {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        
+        .steps h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+        }
+        
+        .step-number {
+            background-color: #27ae60;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .step-text {
+            color: #555;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 600px) {
+            .email-container {
+                margin: 10px;
+                border-radius: 5px;
+            }
+            
+            .content {
+                padding: 25px 20px;
+            }
+            
+            .header {
+                padding: 25px 15px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .verification-code .code {
+                font-size: 24px;
+                letter-spacing: 4px;
+            }
+            
+            .button {
+                display: block;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="verify-icon">✅</div>
+            <h1>Verify Your Account</h1>
+            <p>Complete your registration process</p>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">Hello {{ username }}!</div>
+            
+            <div class="message">
+                <p>Thank you for signing up with Shoppersky! To complete your registration and secure your account, please verify your email address.</p>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{ verification_link }}" class="button">Verify My Account</a>
+            </div>
+            
+            <div class="message" style="text-align: center; margin: 20px 0;">
+                <p><strong>OR</strong></p>
+            </div>
+            
+            <div class="verification-code">
+                <h3>🔢 Enter this verification code:</h3>
+                <div class="code">{{ verification_code }}</div>
+                <p style="color: #666; font-size: 14px; margin-top: 10px;">
+                    Copy and paste this code into the verification form
+                </p>
+            </div>
+            
+            <div class="expiry-warning">
+                <h4>⏰ Time Sensitive</h4>
+                <p>This verification code will expire in {{ expiry_minutes }} minutes.</p>
+            </div>
+            
+            <div class="steps">
+                <h3>📋 How to verify your account:</h3>
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-text">Click the "Verify My Account" button above, or</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-text">Copy the verification code and paste it in the verification form</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-text">Complete the verification process to activate your account</div>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <h3>🎯 Why verify your account?</h3>
+                <p style="color: #555; margin-bottom: 10px;">• Secure your account and protect your personal information</p>
+                <p style="color: #555; margin-bottom: 10px;">• Enable password recovery and account notifications</p>
+                <p style="color: #555; margin-bottom: 10px;">• Access all features and services on our platform</p>
+                <p style="color: #555;">• Ensure you receive important updates about your orders</p>
+            </div>
+            
+            <div class="message">
+                <p>If you didn't create an account with us, please ignore this email or contact our support team if you have concerns.</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Shoppersky Team</strong></p>
+            <p>Welcome to our community!</p>
+            <div class="company-info">
+                <p>&copy; {{ current_year }} Shoppersky. All rights reserved.</p>
+                <p>This email was sent from an automated system. Please do not reply to this email.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
