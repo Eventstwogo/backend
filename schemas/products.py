@@ -91,8 +91,15 @@ class ProductResponse(BaseModel):
     status_flags: Dict[str, bool]
     timestamp: Optional[datetime]
     
+    category_id: Optional[str]
     category_name: Optional[str]
+    subcategory_id: Optional[str]
     subcategory_name: Optional[str]
+
+
+class ProductListResponse(BaseModel):
+    products: List[ProductResponse]
+    total_count: int
 
     
 

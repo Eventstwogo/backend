@@ -1,6 +1,6 @@
 from datetime import datetime
 import re
-from typing import List
+from typing import List, Optional
 
 from pydantic import (
     BaseModel,
@@ -9,6 +9,9 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+
+# Australian phone number regex pattern
+AU_PHONE_REGEX = r"^(?:\+61|0)[2-478](?:[ -]?[0-9]){8}$"
 
 from utils.email_validators import EmailValidator
 from utils.validators import (
@@ -192,7 +195,7 @@ class UserRegisterRequest(BaseModel):
         min_length=10,
         max_length=20,
         title="Phone Number",
-        description="User's phone number (10-20 characters).",
+        description="Australian phone number in valid format, e.g., 0412 345 678 or +61 412 345 678.",
     )
     password: str = Field(
         ...,
@@ -251,17 +254,15 @@ class UserRegisterRequest(BaseModel):
     @field_validator("phone_number")
     @classmethod
     def validate_phone_number(cls, v):
-        """Validate phone number."""
+        """Validate Australian phone number."""
         v = normalize_whitespace(v)
         if not v:
             raise ValueError("Phone number cannot be empty.")
-        # Remove common phone number formatting
-        cleaned_phone = re.sub(r'[^\d+]', '', v)
-        if not validate_length_range(cleaned_phone, 10, 20):
-            raise ValueError("Phone number must be 10-20 digits long.")
-        if not re.match(r'^\+?[\d]+$', cleaned_phone):
-            raise ValueError("Phone number can only contain digits and optional leading +.")
-        return cleaned_phone
+        # Remove spaces or dashes for validation
+        cleaned = re.sub(r"[ -]", "", v)
+        if not re.fullmatch(AU_PHONE_REGEX, cleaned):
+            raise ValueError("Invalid Australian phone number format.")
+        return v
 
     @field_validator("password")
     @classmethod
@@ -373,6 +374,11 @@ class UserLoginResponse(BaseModel):
         ...,
         title="User ID",
         description="Unique identifier for the logged-in user.",
+    )
+    access_token: str = Field(
+        ...,
+        title="Access Token",
+        description="JWT access token for authenticated requests.",
     )
 
 
@@ -681,4 +687,144 @@ class UserResetPasswordResponse(BaseModel):
         ...,
         title="Message",
         description="Password reset confirmation message.",
+    )
+
+
+class UserUpdateRequest(BaseModel):
+    """Schema for user update request."""
+    
+    first_name: Optional[str] = Field(
+        None,
+        min_length=2,
+        max_length=50,
+        title="First Name",
+        description="User's first name (2-50 characters).",
+    )
+    last_name: Optional[str] = Field(
+        None,
+        min_length=2,
+        max_length=50,
+        title="Last Name",
+        description="User's last name (2-50 characters).",
+    )
+    username: Optional[str] = Field(
+        None,
+        min_length=4,
+        max_length=50,
+        title="Username",
+        description="Unique username (4-50 characters).",
+    )
+    email: Optional[EmailStr] = Field(
+        None,
+        title="Email Address",
+        description="Valid email address for the user.",
+    )
+    phone_number: Optional[str] = Field(
+        None,
+        min_length=10,
+        max_length=20,
+        title="Phone Number",
+        description="Australian phone number in valid format, e.g., 0412 345 678 or +61 412 345 678.",
+    )
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def validate_names(cls, v):
+        """Validate first and last names."""
+        if v is None:
+            return v
+        v = normalize_whitespace(v)
+        if not v:
+            raise ValueError("Name cannot be empty.")
+        if not validate_length_range(v, 2, 50):
+            raise ValueError("Name must be 2-50 characters long.")
+        if not v.replace(" ", "").replace("-", "").isalpha():
+            raise ValueError("Name can only contain letters, spaces, and hyphens.")
+        return v.title()
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v):
+        """Validate username."""
+        if v is None:
+            return v
+        v = normalize_whitespace(v)
+        if not v:
+            raise ValueError("Username cannot be empty.")
+        if not validate_length_range(v, 4, 50):
+            raise ValueError("Username must be 4-50 characters long.")
+        if not re.match(r"^[a-zA-Z0-9_. ]+$", v):
+            raise ValueError("Username can only contain letters, numbers, underscores, dots, hyphens, and spaces.")
+        return v.lower()
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v):
+        """Validate email address."""
+        if v is None:
+            return v
+        v = normalize_whitespace(v)
+        if not v:
+            raise ValueError("Email cannot be empty.")
+        EmailValidator.validate(str(v))
+        return v.lower()
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number(cls, v):
+        """Validate Australian phone number."""
+        if v is None:
+            return v
+        v = normalize_whitespace(v)
+        if not v:
+            raise ValueError("Phone number cannot be empty.")
+        # Remove spaces or dashes for validation
+        cleaned = re.sub(r"[ -]", "", v)
+        if not re.fullmatch(AU_PHONE_REGEX, cleaned):
+            raise ValueError("Invalid Australian phone number format.")
+        return v
+
+
+class UserUpdateResponse(BaseModel):
+    """Schema for user update response."""
+    
+    user_id: str = Field(
+        ...,
+        title="User ID",
+        description="Unique identifier for the updated user.",
+    )
+    message: str = Field(
+        ...,
+        title="Message",
+        description="Update success message.",
+    )
+
+
+class UserDeleteResponse(BaseModel):
+    """Schema for user delete response."""
+    
+    user_id: str = Field(
+        ...,
+        title="User ID",
+        description="Unique identifier for the deleted user.",
+    )
+    message: str = Field(
+        ...,
+        title="Message",
+        description="Delete success message.",
+    )
+
+
+class UserRestoreResponse(BaseModel):
+    """Schema for user restore response."""
+    
+    user_id: str = Field(
+        ...,
+        title="User ID",
+        description="Unique identifier for the restored user.",
+    )
+    message: str = Field(
+        ...,
+        title="Message",
+        description="Restore success message.",
     )

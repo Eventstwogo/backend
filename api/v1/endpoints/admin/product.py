@@ -8,13 +8,14 @@ from utils.file_uploads import get_media_url, save_uploaded_file
 # from core.upload_files_to_space import upload_file_to_s3
 from sqlalchemy.orm import selectinload
 from utils.id_generators import generate_lowercase
-from schemas.products import ProductResponse
+from schemas.products import ProductResponse, ProductListResponse
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.status_codes import APIResponse, StatusCode
 from db.models.superadmin import Category, SubCategory, Product, VendorLogin
 from db.sessions.database import get_db
 from sqlalchemy.future import select
+from sqlalchemy import func
 
 UPLOAD_CATEGORY_FOLDER = "uploads/products"
 
@@ -329,7 +330,9 @@ async def create_product(
             tags_and_relationships=db_product.tags_and_relationships,
             status_flags=db_product.status_flags,
             timestamp=db_product.timestamp,
+            category_id=db_product.category_id,
             category_name=category_name,
+            subcategory_id=db_product.subcategory_id,
             subcategory_name=subcategory_name
         )
 
@@ -342,9 +345,14 @@ async def create_product(
         await db.rollback()
         return APIResponse.response(StatusCode.SERVER_ERROR, f"Unexpected error: {str(e)}", log_error=True)
 
-@router.get("/", response_model=List[ProductResponse], status_code=200)
+@router.get("/", response_model=ProductListResponse, status_code=200)
 async def get_all_products(db: AsyncSession = Depends(get_db)):
     try:
+        # Get total count of products
+        count_result = await db.execute(select(func.count(Product.product_id)))
+        total_count = count_result.scalar()
+
+        # Get all products with category and subcategory information
         result = await db.execute(select(Product).options(
             selectinload(Product.category),
             selectinload(Product.subcategory)
@@ -352,11 +360,7 @@ async def get_all_products(db: AsyncSession = Depends(get_db)):
         products = result.scalars().all()
 
         if not products:
-            return APIResponse.response(
-                StatusCode.NOT_FOUND,
-                "No products found",
-                log_error=False,
-            )
+            return ProductListResponse(products=[], total_count=0)
 
         # Convert ORM objects to response-ready dicts
         product_responses = []
@@ -366,16 +370,18 @@ async def get_all_products(db: AsyncSession = Depends(get_db)):
             # Remove internal SQLAlchemy state
             product_data.pop("_sa_instance_state", None)
 
+            product_data["category_id"] = product.category_id
             product_data["category_name"] = (
                 product.category.category_name if product.category else None
             )
+            product_data["subcategory_id"] = product.subcategory_id
             product_data["subcategory_name"] = (
                 product.subcategory.subcategory_name if product.subcategory else None
             )
 
             product_responses.append(ProductResponse(**product_data))
 
-        return product_responses
+        return ProductListResponse(products=product_responses, total_count=total_count)
 
     except Exception as e:
         return APIResponse.response(
@@ -418,7 +424,9 @@ async def get_product_by_id(product_id: str, db: AsyncSession = Depends(get_db))
             tags_and_relationships=product.tags_and_relationships,
             status_flags=product.status_flags,
             timestamp=product.timestamp,
+            category_id=product.category_id,
             category_name=category_name,
+            subcategory_id=product.subcategory_id,
             subcategory_name=subcategory_name,
         )
         return product_response
@@ -466,7 +474,9 @@ async def get_product_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
             tags_and_relationships=product.tags_and_relationships,
             status_flags=product.status_flags,
             timestamp=product.timestamp,
+            category_id=product.category_id,
             category_name=product.category.category_name if product.category else None,
+            subcategory_id=product.subcategory_id,
             subcategory_name=product.subcategory.subcategory_name if product.subcategory else None,
         )
 
@@ -523,7 +533,9 @@ async def get_products_by_vendor_id(
                     status_flags=product.status_flags,
                     images={"urls": image_urls} if image_urls else None,
                     timestamp=product.timestamp,
+                    category_id=product.category_id,
                     category_name=product.category.category_name if product.category else None,
+                    subcategory_id=product.subcategory_id,
                     subcategory_name=product.subcategory.subcategory_name if product.subcategory else None,
                 )
             )
@@ -655,7 +667,9 @@ async def update_product(
         tags_and_relationships=product.tags_and_relationships,
         status_flags=product.status_flags,
         timestamp=product.timestamp,
+        category_id=product.category_id,
         category_name=category_name,
+        subcategory_id=product.subcategory_id,
         subcategory_name=subcategory_name
     )
 
@@ -776,7 +790,9 @@ async def update_product_by_slug(
         tags_and_relationships=product.tags_and_relationships,
         status_flags=product.status_flags,
         timestamp=product.timestamp,
+        category_id=product.category_id,
         category_name=category_name,
+        subcategory_id=product.subcategory_id,
         subcategory_name=subcategory_name
     )
 
