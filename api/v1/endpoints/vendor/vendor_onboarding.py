@@ -142,7 +142,8 @@ async def vendor_onboarding(
             location=location_cleaned,
             industry=data.industry_id,
             purpose=json.dumps([p.value for p in data.purpose]),
-            ref_number=ref_number
+            ref_number=ref_number,
+            is_approved= 0
         )
 
         db.add(new_profile)

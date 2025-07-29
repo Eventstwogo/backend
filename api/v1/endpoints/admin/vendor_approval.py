@@ -33,8 +33,8 @@ async def approve_vendor(
         raise HTTPException(status_code=404, detail="Business profile not found")
 
     # Update values
-    vendor.is_verified = True
-    business_profile.is_approved = True
+    vendor.is_verified = 1
+    business_profile.is_approved = 1
 
     db.add_all([vendor, business_profile])
     await db.commit()
@@ -68,8 +68,8 @@ async def approve_vendor(
         raise HTTPException(status_code=404, detail="Business profile not found")
 
     # Update values
-    vendor.is_verified = False
-    business_profile.is_approved = False
+    vendor.is_verified = 0
+    business_profile.is_approved = 2
 
     db.add_all([vendor, business_profile])
     await db.commit()

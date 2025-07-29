@@ -237,7 +237,7 @@ class VendorLogin(Base):
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String, unique=True)
-    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_verified: Mapped[int] = mapped_column(Integer, default=False)
     business_profile_id: Mapped[str] = mapped_column(
         String(length=6),
         unique=True
@@ -297,7 +297,7 @@ class BusinessProfile(Base):
     ref_number: Mapped[str] = mapped_column(String(length=6), unique=True)
  
     purpose: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_approved: Mapped[int] = mapped_column(Integer, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
  
  

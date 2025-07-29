@@ -19,13 +19,6 @@ from fastapi import APIRouter, Depends, status, BackgroundTasks
 router = APIRouter()
 
 
-class ResendVerificationRequest(BaseModel):
-    email: EmailStr = Field(
-        ...,
-        title="Email Address",
-        description="Email address to resend verification to."
-    )
-
 async def copy_data(db: AsyncSession, user_email: str, encrypted_email: str):
     try:
         email_hash = hash_data(user_email)

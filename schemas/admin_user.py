@@ -154,9 +154,10 @@ class AdminLoginRequest(BaseModel):
 
 
 class AdminUserInfo(BaseModel):
-    is_approved: bool
+    is_approved: int
     ref_number: str
     industry: str
+    onboarding_status: str  
 
 class AdminLoginResponse(BaseModel):
     access_token: str

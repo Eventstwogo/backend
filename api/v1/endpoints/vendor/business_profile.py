@@ -44,7 +44,7 @@ router = APIRouter()
 #         abn_hash=abn_hash,
 #         profile_details=encrypted_profile_json,
 #         business_logo="",
-#         is_approved=False
+#         is_approved=0
 #     )
 
 #     db.add(new_profile)

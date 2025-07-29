@@ -27,130 +27,117 @@ class StoreNameCheckResponse(BaseModel):
 
 MAX_LOGIN_ATTEMPTS = 5
 
+
 @router.post("/login", response_model=AdminLoginResponse)
 async def login_user(
     login_data: AdminLoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    
     email_hash = hash_data(login_data.email)
-    
-    # First check if user exists in VendorSignup and email verification status
+
+    # Step 1: Check VendorSignup table
     signup_stmt = select(VendorSignup).where(VendorSignup.email_hash == email_hash)
     signup_result = await db.execute(signup_stmt)
     signup_user = signup_result.scalar_one_or_none()
-    
-    # Check email verification status first
+
     if signup_user and not signup_user.email_flag:
         raise HTTPException(
-            status_code=403, 
+            status_code=401,
             detail="Please verify your email address before logging in."
         )
-    
-    # Find user by email in VendorLogin table
-    stmt = select(VendorLogin).where(
-        VendorLogin.email_hash == email_hash
-    )
+
+    # Step 2: VendorLogin lookup
+    stmt = select(VendorLogin).where(VendorLogin.email_hash == email_hash)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
     if not user:
-        # Check if user exists in signup table but hasn't verified email
         if signup_user:
             if not signup_user.email_flag:
                 raise HTTPException(
-                    status_code=400, 
+                    status_code=401,
                     detail="Please verify your email first before logging in."
                 )
             else:
                 raise HTTPException(
-                    status_code=500, 
+                    status_code=422,
                     detail="Account verification incomplete. Please contact support."
                 )
         else:
-            # User doesn't exist in either table
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail="Account not found. Please register first."
             )
 
-    # Check if account is locked
+    # Step 3: Account lock
     if user.login_status == 1:
-        raise HTTPException(status_code=423, detail="Account is locked. Try after 24 hours.")
-
-    # Compare password
-    if not pwd_context.verify(login_data.password, user.password):
-        # Increment failed login attempts
-        user.login_failed_attempts += 1
-        
-        # Check if we've reached the maximum failed attempts
-        if user.login_failed_attempts >= MAX_LOGIN_ATTEMPTS:
-            user.login_status = 1  # Lock the account
-            user.locked_time = datetime.utcnow()
-            db.add(user)
-            await db.commit()
-            raise HTTPException(status_code=423, detail="Account is locked. Try after 24 hours.")
-        
-        db.add(user)
-        await db.commit()
-        remaining_attempts = MAX_LOGIN_ATTEMPTS - user.login_failed_attempts
         raise HTTPException(
-            status_code=401, 
-            detail=f"Incorrect password. {remaining_attempts} attempts remaining before account lock."
+            status_code=423,
+            detail="Account is locked. Try again after 24 hours."
         )
 
+    # Step 4: Password check
+    if not pwd_context.verify(login_data.password, user.password):
+        user.login_failed_attempts += 1
+        if user.login_failed_attempts >= MAX_LOGIN_ATTEMPTS:
+            user.login_status = 1
+            user.locked_time = datetime.utcnow()
+        db.add(user)
+        await db.commit()
+        remaining = MAX_LOGIN_ATTEMPTS - user.login_failed_attempts
+        raise HTTPException(
+            status_code=401,
+            detail=f"Incorrect password. {remaining} attempts remaining before account lock."
+        )
+
+    # Step 5: Inactive check
     if user.is_active:
-        raise HTTPException(status_code=403, detail="User is inactive")
+        raise HTTPException(
+            status_code=403,
+            detail="Your account is inactive. Please contact support."
+        )
 
-    # if not user.is_verified:
-    #     # Get the business profile reference number for this user
-    #     profile_stmt = select(BusinessProfile.ref_number).where(
-    #         BusinessProfile.profile_ref_id == user.business_profile_id
-    #     )
-    #     profile_result = await db.execute(profile_stmt)
-    #     ref_number = profile_result.scalar_one_or_none() or "N/A"
-        
-    #     raise HTTPException(
-    #         status_code=402, 
-    #         detail=f"Your business profile is under verification, check again later. Reference number: {ref_number}"
-    #     )
+    # Step 6: Business profile
+    profile_stmt = select(
+        BusinessProfile.is_approved,
+        BusinessProfile.ref_number,
+        BusinessProfile.industry
+    ).where(BusinessProfile.profile_ref_id == user.business_profile_id)
+    profile_result = await db.execute(profile_stmt)
+    profile_data = profile_result.one_or_none()
 
-    # Successful login - update login tracking
-    user.login_attempts += 1  # Increment successful login attempts
-    user.login_failed_attempts = 0  # Reset failed attempts on successful login
+    is_approved, ref_number, industry = profile_data if profile_data else (-1, "", "")
+
+    # Step 7: Determine onboarding_status
+    if user.is_verified and is_approved == 1:
+        onboarding_status = "approved"
+    elif not user.is_verified and is_approved == -1:
+        onboarding_status = "not_started"
+    elif not user.is_verified and is_approved == 2:
+        onboarding_status = "rejected"
+    elif not user.is_verified and is_approved == 0 and ref_number:
+        onboarding_status = "under_review"
+    else:
+        onboarding_status = "unknown"
+
+    # Step 8: Successful login
+    user.login_attempts += 1
+    user.login_failed_attempts = 0
     user.last_login = datetime.utcnow()
-    user.login_status = 0  # Set to active
-    
-    # Ensure the user object is added to the session and commit changes
+    user.login_status = 0
+
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    profile_stmt = select(
-    BusinessProfile.is_approved,
-    BusinessProfile.ref_number,
-    BusinessProfile.industry 
-        ).where(
-            BusinessProfile.profile_ref_id == user.business_profile_id
-        )
-
-    profile_result = await db.execute(profile_stmt)
-    profile_data = profile_result.one_or_none()
-
-    if profile_data:
-        is_approved, ref_number, industry = profile_data
-    else:
-        is_approved, ref_number, industry = False, "", ""
-
+    # Step 9: Prepare response
     user_info = AdminUserInfo(
-            is_approved=is_approved,
-            ref_number=ref_number,
-            industry=industry,
-        )
+        is_approved=is_approved,
+        ref_number=ref_number,
+        industry=industry,
+        onboarding_status=onboarding_status
+    )
 
-
-
-    # Create JWT token
     token_data = {
         "userId": user.user_id,
         "bprofileId": user.business_profile_id,
