@@ -1,4 +1,5 @@
 
+from datetime import datetime
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -73,13 +74,11 @@ async def register_user(
 
     new_user = VendorSignup(
         signup_id=signup_id,
-       
-       
         password=hashed_password,
         email=encrypted_email,
         email_hash=email_hash,
-       
         email_token=email_token,
+        email_token_timestamp=datetime.utcnow(),
     )
 
     db.add(new_user)
@@ -87,7 +86,7 @@ async def register_user(
     await db.refresh(new_user)
 
     # Create verification link with both email and token (URL encoded)
-    verification_link = f"{settings.FRONTEND_URL}/vendor/verify?token={email_token}&email={quote(user_data.email)}"
+    verification_link = f"{settings.FRONTEND_URL}/emailconfirmation?token={email_token}&email={quote(user_data.email)}"
     
     # Send vendor verification email instead of welcome email
     background_tasks.add_task(

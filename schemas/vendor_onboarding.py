@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, EmailStr, Field, HttpUrl, field_validator
 from enum import Enum
 import re
 
@@ -52,3 +52,12 @@ class OnboardingRequest(BaseModel):
         if not re.match(r'^[a-zA-Z0-9 ,]+$', v):
             raise ValueError("Location contains invalid characters")
         return v
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr = Field(
+        ...,
+        title="Email Address",
+        description="Email address to resend verification to."
+    )
+ 

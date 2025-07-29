@@ -207,7 +207,7 @@ class EmailTemplateService:
         
         return self.send_template_email(
             to_email=email,
-            subject="Verify Your Shoppersky Account ✅",
+            subject="Verify Your Shoppersky Account",
             template_name="account_verification_email.html",
             context=context
         )
@@ -322,7 +322,7 @@ class EmailTemplateService:
             'vendor_email': vendor_email,
             'business_name': business_name,
             'verification_token': verification_token,
-            'verification_link': verification_link or f"{settings.FRONTEND_URL}/vendor/verify?token={verification_token}",
+            'verification_link': verification_link or f"{settings.FRONTEND_URL}/emailconfirmation?token={verification_token}",
             'expiry_minutes': expiry_minutes,
             'registration_date': datetime.now(tz=timezone.utc).strftime("%B %d, %Y at %I:%M %p UTC"),
             'header_subtitle': 'Verify your vendor account to get started'
@@ -330,7 +330,7 @@ class EmailTemplateService:
         
         return self.send_template_email(
             to_email=vendor_email,
-            subject="Verify Your Shoppersky Vendor Account 🏪✅",
+            subject="Verify Your Shoppersky Vendor Account",
             template_name="vendor_verification_email.html",
             context=context
         )

@@ -221,8 +221,9 @@ class VendorSignup(Base):
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email_hash: Mapped[str]= mapped_column(String, unique=True, nullable=False)
     password: Mapped[str] = mapped_column(String, unique= True)
-    email_token: Mapped[str] = mapped_column(String, unique=True)
+    email_token: Mapped[str] = mapped_column(String, unique=True, nullable=True)
     email_flag: Mapped[bool] = mapped_column(Boolean, default=False)
+    email_token_timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     

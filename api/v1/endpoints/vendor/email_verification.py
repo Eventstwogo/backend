@@ -1,12 +1,20 @@
+from datetime import datetime, timedelta
 from sqlalchemy import select
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from schemas.vendor_onboarding import ResendVerificationRequest
+from services import email_service
 from db.models.superadmin import VendorLogin, VendorSignup, Role
 from utils.id_generators import  hash_data, generate_digits_letters, generate_digits_lowercase, generate_digits_uppercase
 from utils.exception_handlers import exception_handler
 from fastapi import APIRouter, Depends, status
 from db.sessions.database import get_db
 from core.api_response import api_response
+from urllib.parse import quote
+from core.config import settings
+
+from utils.id_generators import  hash_data, generate_digits_letters, generate_digits_lowercase, generate_digits_uppercase, random_token
+from fastapi import APIRouter, Depends, status, BackgroundTasks
 
 router = APIRouter()
 
@@ -87,7 +95,6 @@ async def verify_email(
     token: str,
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-
     # Hash the email for lookup
     email_hash = hash_data(email)
 
@@ -101,7 +108,7 @@ async def verify_email(
         return api_response(
             status_code=status.HTTP_404_NOT_FOUND,
             message="User not found.",
-            log_error= True
+            log_error=True
         )
 
     if user.email_flag:
@@ -110,15 +117,25 @@ async def verify_email(
             message="Email already verified.",
         )
 
+    # Check if the token has expired (30 minutes)
+    if not user.email_token_timestamp or (datetime.utcnow() > user.email_token_timestamp + timedelta(minutes=30)):
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Verification token has expired. Please request a new verification email.",
+            log_error=True
+        )
+
     if user.email_token != token:
         return api_response(
             status_code=status.HTTP_400_BAD_REQUEST,
             message="Invalid verification token.",
-            log_error= True
+            log_error=True
         )
 
     # Mark email as verified
     user.email_flag = True
+    user.email_token = None  # Clear token after successful verification
+    user.email_token_timestamp = None  # Clear timestamp after verification
     await db.commit()
     await db.refresh(user)
 
@@ -128,62 +145,133 @@ async def verify_email(
 
     return api_response(
         status_code=status.HTTP_200_OK,
-        message="Email verified and user login created.",
-        
+        message="Your email has been successfully verified.",
     )
+
+
+# @router.post(
+#     "/fix-account",
+#     status_code=status.HTTP_200_OK,
+# )
+# @exception_handler
+# async def fix_stuck_account(
+#     email: str,
+#     db: AsyncSession = Depends(get_db),
+# ) -> JSONResponse:
+#     """
+#     Utility endpoint to fix accounts stuck between signup and login tables.
+#     Use this if a user completed email verification but can't log in.
+#     """
+    
+#     email_hash = hash_data(email)
+    
+#     # Check signup table
+#     signup_result = await db.execute(
+#         select(VendorSignup).where(VendorSignup.email_hash == email_hash)
+#     )
+#     signup_user = signup_result.scalar_one_or_none()
+    
+#     if not signup_user:
+#         return api_response(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             message="User not found in signup table.",
+#         )
+    
+#     if not signup_user.email_flag:
+#         return api_response(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             message="Email not verified yet. Please verify email first.",
+#         )
+    
+#     # Check if already exists in login table
+#     login_result = await db.execute(
+#         select(VendorLogin).where(VendorLogin.email_hash == email_hash)
+#     )
+#     login_user = login_result.scalar_one_or_none()
+    
+#     if login_user:
+#         return api_response(
+#             status_code=status.HTTP_200_OK,
+#             message="Account already exists in login table. Login should work.",
+#         )
+    
+#     # Copy from signup to login
+#     copy_result = await copy_data(db, email, signup_user.email)
+    
+#     return api_response(
+#         status_code=status.HTTP_200_OK,
+#         message="Account successfully moved to login table. You can now log in.",
+#         data=copy_result
+#     )
+
 
 
 @router.post(
-    "/fix-account",
+    "/resend-verification",
     status_code=status.HTTP_200_OK,
 )
 @exception_handler
-async def fix_stuck_account(
-    email: str,
+async def resend_verification_email(
+    background_tasks: BackgroundTasks,
+    request: ResendVerificationRequest,
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
-    Utility endpoint to fix accounts stuck between signup and login tables.
-    Use this if a user completed email verification but can't log in.
+    Resend verification email to vendor.
+    This endpoint generates a new verification token and sends a new verification email.
     """
-    
-    email_hash = hash_data(email)
-    
-    # Check signup table
-    signup_result = await db.execute(
+   
+    # Hash the email for lookup
+    email_hash = hash_data(request.email)
+   
+    # Look up the user by email hash in VendorSignup table
+    result = await db.execute(
         select(VendorSignup).where(VendorSignup.email_hash == email_hash)
     )
-    signup_user = signup_result.scalar_one_or_none()
-    
-    if not signup_user:
+    user = result.scalar_one_or_none()
+   
+    if not user:
         return api_response(
             status_code=status.HTTP_404_NOT_FOUND,
-            message="User not found in signup table.",
+            message="User not found. Please register first.",
+            log_error=True
         )
-    
-    if not signup_user.email_flag:
+   
+    # Check if email is already verified
+    if user.email_flag:
         return api_response(
             status_code=status.HTTP_400_BAD_REQUEST,
-            message="Email not verified yet. Please verify email first.",
+            message="Email is already verified. You can proceed to login.",
         )
-    
-    # Check if already exists in login table
-    login_result = await db.execute(
-        select(VendorLogin).where(VendorLogin.email_hash == email_hash)
+   
+    # Generate new verification token and set timestamp
+    new_email_token = random_token()
+    user.email_token = new_email_token
+    user.email_token_timestamp = datetime.utcnow()
+   
+    # Update the user's record
+    await db.commit()
+    await db.refresh(user)
+   
+    # Create verification link with both email and token (URL encoded)
+    verification_link = f"{settings.FRONTEND_URL}/emailconfirmation?token={new_email_token}&email={quote(request.email)}"
+   
+    # Send verification email in background
+    background_tasks.add_task(
+        email_service.send_vendor_verification_email,
+        vendor_email=request.email,
+        vendor_name=request.email.split('@')[0],  # Use email prefix as vendor name
+        verification_token=new_email_token,
+        business_name="Your Business",
+        verification_link=verification_link,
+        expiry_minutes=30
     )
-    login_user = login_result.scalar_one_or_none()
-    
-    if login_user:
-        return api_response(
-            status_code=status.HTTP_200_OK,
-            message="Account already exists in login table. Login should work.",
-        )
-    
-    # Copy from signup to login
-    copy_result = await copy_data(db, email, signup_user.email)
-    
+   
     return api_response(
         status_code=status.HTTP_200_OK,
-        message="Account successfully moved to login table. You can now log in.",
-        data=copy_result
+        message="Verification email has been resent successfully. Please check your email.",
+        data={
+            "email": request.email,
+            "message": "New verification email sent"
+        }
     )
