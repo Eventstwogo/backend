@@ -155,8 +155,36 @@ class EmailTemplateService:
         
         return self.send_template_email(
             to_email=email,
-            subject="Password Reset Request - Shoppersky 🔐",
+            subject="Password Reset Request - Shoppersky Admin 🔐",
             template_name="password_reset_email.html",
+            context=context
+        )
+    
+    def send_user_password_reset_email(
+        self,
+        email: EmailStr,
+        username: str,
+        reset_link: str,
+        expiry_minutes: int = 30,
+        ip_address: str = "Unknown",
+        user_agent: str = "Unknown"
+    ) -> bool:
+        """Send password reset email for regular users"""
+        context = {
+            'username': username,
+            'reset_link': reset_link,
+            'expiry_minutes': expiry_minutes,
+            'ip_address': ip_address,
+            'user_agent': user_agent,
+            'request_time': datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            'header_subtitle': 'Reset your account password',
+            'is_user_account': True  # Flag to distinguish from admin emails
+        }
+        
+        return self.send_template_email(
+            to_email=email,
+            subject="Password Reset Request - Shoppersky 🔐",
+            template_name="user_password_reset_email.html",
             context=context
         )
     
@@ -407,6 +435,71 @@ def send_vendor_verification_email(
         business_name=business_name,
         verification_link=verification_link,
         expiry_minutes=expiry_minutes
+    )
+
+
+def send_user_verification_email(
+    email: EmailStr,
+    username: str,
+    verification_token: str,
+    user_id: str,
+    expires_in_minutes: int = 60
+) -> bool:
+    """Send user verification email with verification link"""
+    try:
+        print(f"Attempting to send verification email to: {email}")
+        verification_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}&user_id={user_id}"
+        
+        context = {
+            'username': username,
+            'email': email,
+            'user_id': user_id,
+            'verification_token': verification_token,
+            'verification_code': verification_token[:8].upper(),  # First 8 chars as display code
+            'verification_link': verification_link,
+            'expiry_minutes': expires_in_minutes,
+            'support_email': settings.SUPPORT_EMAIL,
+            'company_name': 'Shoppersky',
+            'current_year': datetime.now().year
+        }
+        
+        print(f"Email context: {context}")
+        
+        # Check if SMTP is configured properly
+        if settings.SMTP_USER == "your-email@gmail.com" or settings.SMTP_PASSWORD == "your-smtp-password":
+            print("SMTP not configured properly - email sending disabled")
+            print(f"Would send email to {email} with verification link: {verification_link}")
+            return True  # Return True to not block registration
+        
+        result = email_service.send_template_email(
+            to_email=email,
+            subject="Welcome to Shoppersky - Please Verify Your Email",
+            template_name="account_verification_email.html",
+            context=context
+        )
+        
+        print(f"Email send result: {result}")
+        return result
+        
+    except Exception as e:
+        print(f"Error sending verification email: {str(e)}")
+        return False
+
+
+def send_user_password_reset_email(
+    email: EmailStr,
+    username: str,
+    reset_link: str,
+    expiry_minutes: int,
+    ip_address: str,
+) -> bool:
+    """Send user password reset email - backward compatible function"""
+    return email_service.send_user_password_reset_email(
+        email=email,
+        username=username,
+        reset_link=reset_link,
+        expiry_minutes=expiry_minutes,
+        ip_address=ip_address
     )
 
 

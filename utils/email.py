@@ -296,3 +296,58 @@ Shoppersky Team
             body=body,
         )
         return success
+
+
+def send_user_password_reset_email(
+    email: str,
+    username: str,
+    reset_link: str,
+    expiry_minutes: int,
+    ip_address: str,
+    request_time: str,
+) -> bool:
+    """Send a password reset email to a regular user."""
+    # Use the new email service for better templates
+    try:
+        from services.email_service import email_service
+        return email_service.send_user_password_reset_email(
+            email=email,
+            username=username,
+            reset_link=reset_link,
+            expiry_minutes=expiry_minutes,
+            ip_address=ip_address
+        )
+    except ImportError:
+        # Fallback to old method if new service is not available
+        body = f"""
+Hello {username},
+
+We received a request to reset your password for your Shoppersky account.
+
+Reset Link: {reset_link}
+
+This link will expire in {expiry_minutes} minutes for security reasons.
+
+Security Information:
+- Request Time: {request_time}
+- IP Address: {ip_address}
+
+If you didn't request this password reset, you can safely ignore this email.
+
+For security reasons, we recommend:
+- Using a strong, unique password
+- Not sharing your login credentials
+- Logging out when finished using your account
+
+Best regards,
+Shoppersky Team
+
+© {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
+        """
+        
+        success = email_sender.send_text_email(
+            to=email,
+            subject="Password Reset Request - Shoppersky",
+            body=body,
+        )
+        return success
