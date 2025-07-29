@@ -103,6 +103,8 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = "your-email@gmail.com"
     EMAIL_FROM_NAME: str = "Shoppersky API"
     EMAIL_TEMPLATES_DIR: str = "templates"
+    SUPPORT_EMAIL: str = "support@shoppersky.com"
+ 
 
     # === JWT ===
     JWT_ALGORITHM: str = "RS256"
