@@ -19,6 +19,7 @@ from api.v1.endpoints import (
 from api.v1.endpoints.vendor import vendor_signup, email_verification, business_profile, vendor_login, vendor_onboarding, fetch_vendors, employee
 from api.v1.endpoints.admin import registration, admin_login, password_manager, product, vendor_approval, admin_users
 from api.v1.endpoints.vendor import vendor_category_mapping
+from api.v1.endpoints.users import register, login, password_manager as user_password_manager
 
 
 api_router = APIRouter(prefix="/api/v1")
@@ -129,4 +130,15 @@ api_router.include_router(
 
 api_router.include_router(
     admin_users.router, prefix="/admin-users", tags=["Admin Users Management"]
+)
+
+# User Endpoints
+api_router.include_router(
+    register.router, prefix="/users", tags=["User Registration"]
+)
+api_router.include_router(
+    login.router, prefix="/users", tags=["User Authentication"]
+)
+api_router.include_router(
+    user_password_manager.router, prefix="/users", tags=["User Password Management"]
 )
