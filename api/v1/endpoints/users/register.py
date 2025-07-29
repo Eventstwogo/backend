@@ -10,13 +10,13 @@ from urllib.parse import unquote
 from core.api_response import api_response
 from db.models.general import User, UserVerification
 from db.sessions.database import get_db
-from schemas.register import UserRegisterRequest, UserRegisterResponse, UserVerificationRequest, UserVerificationResponse
+from schemas.register import UserRegisterRequest, UserRegisterResponse, UserVerificationRequest, UserVerificationResponse, ResendVerificationRequest, ResendVerificationResponse
 from services.admin_user import get_config_or_404
 from services.email_service import send_user_verification_email
 from services.user_service import validate_unique_user, generate_verification_tokens
 from utils.auth import hash_password
 from utils.exception_handlers import exception_handler
-from utils.id_generators import generate_lower_uppercase, encrypt_data, hash_data
+from utils.id_generators import generate_lower_uppercase, encrypt_data, hash_data, decrypt_data
 from datetime import datetime, timezone
 from sqlalchemy import select
 
@@ -266,5 +266,120 @@ async def verify_user_email(
         data=UserVerificationResponse(
             message="Email verified successfully. You can now log in.",
             user_id=user.user_id,
+        ),
+    )
+
+
+@router.post(
+    "/resend-verification",
+    response_model=ResendVerificationResponse,
+    status_code=status.HTTP_200_OK,
+)
+@exception_handler
+async def resend_verification_email(
+    background_tasks: BackgroundTasks,
+    request_data: ResendVerificationRequest,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Resend verification email to user who hasn't verified their account yet.
+    """
+    
+    # Hash email for lookup
+    email_hash = hash_data(request_data.email.lower())
+    
+    # Find user by email hash
+    user_result = await db.execute(
+        select(User).where(User.email_hash == email_hash)
+    )
+    user = user_result.scalar_one_or_none()
+    
+    if not user:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="User not found with this email address.",
+            log_error=True,
+        )
+    
+    # Check if user is already verified
+    if user.login_status == 0:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="This email address is already verified.",
+            log_error=False,
+        )
+    
+    # Check if user is not in an unverified state (login_status should be -1)
+    if user.login_status != -1:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="User account is not in a state that requires email verification.",
+            log_error=False,
+        )
+    
+    # Find verification record
+    verification_result = await db.execute(
+        select(UserVerification).where(UserVerification.user_id == user.user_id)
+    )
+    verification = verification_result.scalar_one_or_none()
+    
+    if not verification:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Verification record not found. Please contact support.",
+            log_error=True,
+        )
+    
+    # Check if email is already verified in verification record
+    if verification.email_verified:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="This email address is already verified.",
+            log_error=False,
+        )
+    
+    # Generate new verification token and expiration time
+    new_verification_token, new_expiration_time = generate_verification_tokens(
+        expires_in_minutes=60
+    )
+    
+    # Update verification record with new token and expiration
+    verification.email_verification_token = new_verification_token
+    verification.email_token_expires_at = new_expiration_time
+    
+    # Save changes
+    db.add(verification)
+    await db.commit()
+    await db.refresh(verification)
+    
+    # Decrypt username for email (we need the original username for the email)
+    username_decrypted = decrypt_data(user.username)
+    
+    # Send verification email in background
+    try:
+        background_tasks.add_task(
+            send_user_verification_email,
+            email=request_data.email,
+            username=username_decrypted,
+            verification_token=new_verification_token,
+            user_id=user.user_id,
+            expires_in_minutes=60,
+        )
+        print(f"Resend verification email task added for user: {request_data.email}")
+    except Exception as e:
+        print(f"Error adding resend verification email task: {str(e)}")
+        # Don't fail the request if email fails, but log the error
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to send verification email. Please try again later.",
+            log_error=True,
+        )
+    
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Verification email resent successfully.",
+        data=ResendVerificationResponse(
+            message="Verification email has been sent to your email address.",
+            email=request_data.email,
         ),
     )

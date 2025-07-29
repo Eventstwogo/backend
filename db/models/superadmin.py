@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any, Dict, Optional
+import uuid
 
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
@@ -210,6 +211,25 @@ class PasswordReset(Base):
 
     # Relationships
     user: Mapped["AdminUser"] = relationship(back_populates="password_resets")
+
+
+class SessionLog(Base):
+    __tablename__ = "session_log"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(length=6), nullable=False)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45))
+    user_agent: Mapped[Optional[str]] = mapped_column(String(512))
+    browser_name: Mapped[Optional[str]] = mapped_column(String(100))
+    browser_version: Mapped[Optional[str]] = mapped_column(String(50))
+    os: Mapped[Optional[str]] = mapped_column(String(100))
+    device_type: Mapped[Optional[str]] = mapped_column(String(50))  # e.g., mobile, desktop
+    login_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    logout_time: Mapped[Optional[datetime]] = mapped_column(DateTime, default=None)
+    login_success: Mapped[bool] = mapped_column(Boolean, default=True)
+    failure_reason: Mapped[Optional[str]] = mapped_column(String(255), default=None)
+    location: Mapped[Optional[str]] = mapped_column(String(255), default=None)  # if using geo IP
 
 
 class VendorSignup(Base):
