@@ -448,7 +448,7 @@ def send_user_verification_email(
     """Send user verification email with verification link"""
     try:
         print(f"Attempting to send verification email to: {email}")
-        verification_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}&user_id={user_id}"
+        verification_link = f"{settings.FRONTEND_URL}/verify-email/{verification_token}?email={email}"
         
         context = {
             'username': username,

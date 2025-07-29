@@ -5,9 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.vendor_onboarding import ResendVerificationRequest
 from services import email_service
 from db.models.superadmin import VendorLogin, VendorSignup, Role
-from utils.id_generators import  hash_data, generate_digits_letters, generate_digits_lowercase, generate_digits_uppercase
+from utils.id_generators import  hash_data, generate_digits_letters, generate_digits_lowercase, generate_digits_uppercase, random_token
 from utils.exception_handlers import exception_handler
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, BackgroundTasks
 from db.sessions.database import get_db
 from core.api_response import api_response
 from urllib.parse import quote
@@ -17,6 +17,14 @@ from utils.id_generators import  hash_data, generate_digits_letters, generate_di
 from fastapi import APIRouter, Depends, status, BackgroundTasks
 
 router = APIRouter()
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr = Field(
+        ...,
+        title="Email Address",
+        description="Email address to resend verification to."
+    )
 
 async def copy_data(db: AsyncSession, user_email: str, encrypted_email: str):
     try:

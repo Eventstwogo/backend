@@ -15,6 +15,7 @@ from schemas.register import UserLoginRequest, UserLoginResponse, UserDetailResp
 from utils.auth import verify_password
 from utils.exception_handlers import exception_handler
 from utils.id_generators import hash_data, decrypt_data
+from utils.jwt import create_access_token
 
 router = APIRouter()
 
@@ -144,12 +145,20 @@ async def login_user(
     await db.commit()
     await db.refresh(user)
     
+    # Generate access token with user ID
+    token_data = {"user_id": user.user_id}
+    access_token = create_access_token(data=token_data)
+    
+    # Log successful login with access token generation
+    print(f"Access token generated for user_id: {user.user_id} at {datetime.now(timezone.utc)}")
+    
     return api_response(
         status_code=status.HTTP_200_OK,
         message="Login successful.",
         data=UserLoginResponse(
             message="Login successful.",
             user_id=user.user_id,
+            access_token=access_token,
         ),
     )
 

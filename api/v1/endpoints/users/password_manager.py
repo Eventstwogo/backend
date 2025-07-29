@@ -176,9 +176,9 @@ async def reset_password_with_token(
 @router.post("/change-password", status_code=status.HTTP_200_OK)
 @exception_handler
 async def change_password(
+    user_id: str = Form(...),
     current_password: str = Form(...),
     new_password: str = Form(...),
-    user_id: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Change password for an authenticated user (requires current password)"""
