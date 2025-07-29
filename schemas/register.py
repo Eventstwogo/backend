@@ -443,6 +443,49 @@ class UserVerificationResponse(BaseModel):
     )
 
 
+class ResendVerificationRequest(BaseModel):
+    """Schema for resend verification email request."""
+    
+    email: EmailStr = Field(
+        ...,
+        title="Email Address",
+        description="User's email address to resend verification to.",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_fields(cls, values):
+        """Validate required fields."""
+        if not values.get("email"):
+            raise ValueError("Email is required.")
+        return values
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v):
+        """Validate email address."""
+        v = normalize_whitespace(v)
+        if not v:
+            raise ValueError("Email cannot be empty.")
+        EmailValidator.validate(str(v))
+        return v.lower()
+
+
+class ResendVerificationResponse(BaseModel):
+    """Schema for resend verification email response."""
+    
+    message: str = Field(
+        ...,
+        title="Message",
+        description="Resend verification success message.",
+    )
+    email: EmailStr = Field(
+        ...,
+        title="Email Address",
+        description="Email address where verification was sent.",
+    )
+
+
 # User GET Routes Schemas
 class BasicUserResponse(BaseModel):
     """Schema for basic user information response."""

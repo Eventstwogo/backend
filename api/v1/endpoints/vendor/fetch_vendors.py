@@ -1,9 +1,12 @@
 import json
+import re
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import joinedload
+import httpx
+from bs4 import BeautifulSoup
 
 from utils.id_generators import decrypt_data, decrypt_dict_values
 from db.models.superadmin import BusinessProfile, VendorLogin, VendorCategoryManagement, Category, Product, Industries
@@ -13,14 +16,193 @@ from schemas.vendor_details import AllVendorsResponse, VendorDetailsResponse, Ve
 
 router = APIRouter()
 
+# Simple in-memory cache for ABN registration dates
+# In production, consider using Redis or database caching
+_abn_date_cache = {}
+
+def clear_abn_cache():
+    """Clear the ABN cache for debugging"""
+    global _abn_date_cache
+    _abn_date_cache = {}
+
+
+def validate_abn_format(abn: str) -> bool:
+    """
+    Validate ABN format (11 digits)
+    """
+    return abn and len(abn) == 11 and abn.isdigit()
+
+
+def parse_date_string(date_text: str) -> datetime:
+    """
+    Parse various date formats commonly found on ABR website
+    """
+    if not date_text:
+        return None
+    
+    date_text = date_text.strip()
+    
+    # List of date formats to try
+    formats = [
+        "%d %b %Y",      # 01 Jan 2020
+        "%d %B %Y",      # 01 January 2020
+        "%d/%m/%Y",      # 01/01/2020
+        "%m/%d/%Y",      # 01/01/2020 (US format)
+        "%Y-%m-%d",      # 2020-01-01
+        "%d-%m-%Y",      # 01-01-2020
+        "%d.%m.%Y",      # 01.01.2020
+        "%b %d, %Y",     # Jan 01, 2020
+        "%B %d, %Y",     # January 01, 2020
+    ]
+    
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_text, fmt)
+        except ValueError:
+            continue
+    
+    return None
+
+
+async def fetch_abn_registration_date(abn_id: str) -> datetime:
+    """
+    Fetch ABN registration date from ABR website with caching
+    """
+    # Validate ABN format first
+    if not validate_abn_format(abn_id):
+        return None
+    
+    # Check cache first
+    if abn_id in _abn_date_cache:
+        return _abn_date_cache[abn_id]
+    
+    try:
+        url = f"https://abr.business.gov.au/ABN/View?id={abn_id}"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url)
+        
+        if response.status_code != 200:
+            return None
+        
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        # Look for ABN registration date more specifically
+        # The ABR website has specific sections for different dates
+        
+        registration_date = None
+        
+        # Method 1: Look for specific ABN registration information
+        # Try to find the ABN status section which contains the registration date
+        abn_status_section = soup.find("h2", string=re.compile("ABN details", re.IGNORECASE))
+        if abn_status_section:
+            # Look for date information in the following table
+            next_table = abn_status_section.find_next("table")
+            if next_table:
+                rows = next_table.find_all("tr")
+                for row in rows:
+                    cells = row.find_all(["th", "td"])
+                    if len(cells) >= 2:
+                        header_text = cells[0].get_text(strip=True).lower()
+                        if any(keyword in header_text for keyword in ["effective", "registered", "date"]):
+                            date_text = cells[1].get_text(strip=True)
+                            parsed_date = parse_date_string(date_text)
+                            if parsed_date:
+                                registration_date = parsed_date
+                                break
+        
+        # Method 2: Look for specific table with "Date registered for GST" or similar
+        if not registration_date:
+            tables = soup.find_all("table")
+            for table in tables:
+                rows = table.find_all("tr")
+                for row in rows:
+                    cells = row.find_all(["th", "td"])
+                    if len(cells) >= 2:
+                        header_text = cells[0].get_text(strip=True)
+                        # More specific patterns for actual registration dates
+                        if re.search(r"Date registered for GST|ABN status.*from|Effective from", header_text, re.IGNORECASE):
+                            date_text = cells[1].get_text(strip=True)
+                            # Skip "Active" or status text, look for actual dates
+                            if not re.search(r"^(Active|Inactive|Cancelled)$", date_text, re.IGNORECASE):
+                                parsed_date = parse_date_string(date_text)
+                                if parsed_date:
+                                    registration_date = parsed_date
+                                    break
+                if registration_date:
+                    break
+        
+        # Method 3: If still no date found, be more careful about which dates we accept
+        if not registration_date:
+            # Look for date patterns but be more selective
+            text_content = soup.get_text()
+            
+            # Find all dates in format "1 Jan 2020" but exclude common system dates
+            date_matches = re.findall(r'\b(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})\b', text_content, re.IGNORECASE)
+            
+            # Filter out common system dates that appear on all pages
+            excluded_dates = [
+                "1 Nov 2014",  # This seems to be appearing on all pages - likely a system date
+                "01 Nov 2014"
+            ]
+            
+            for date_match in date_matches:
+                if date_match not in excluded_dates:
+                    parsed_date = parse_date_string(date_match)
+                    if parsed_date and 2000 <= parsed_date.year <= 2024:  # Reasonable business registration year range
+                        registration_date = parsed_date
+                        break
+        
+        # Cache the result (even if None to avoid repeated failed lookups)
+        _abn_date_cache[abn_id] = registration_date
+        return registration_date
+        
+    except Exception as e:
+        # Cache the None result to avoid repeated failed attempts
+        _abn_date_cache[abn_id] = None
+        return None
+
+
+def calculate_years_in_business_from_abn(abn_registration_date: datetime) -> str:
+    """
+    Calculate years and months in business from ABN registration date.
+    Returns format: "X years Y months"
+    """
+    if not abn_registration_date:
+        return "0 years 0 months"
+    
+    now = datetime.now(abn_registration_date.tzinfo) if abn_registration_date.tzinfo else datetime.now()
+    
+    # Calculate the difference
+    years = now.year - abn_registration_date.year
+    months = now.month - abn_registration_date.month
+    
+    # Adjust if the current month/day is before the registration month/day
+    if months < 0:
+        years -= 1
+        months += 12
+    elif months == 0 and now.day < abn_registration_date.day:
+        years -= 1
+        months = 11
+    elif now.day < abn_registration_date.day:
+        months -= 1
+        if months < 0:
+            years -= 1
+            months = 11
+    
+    # Format the response
+    year_text = "year" if years == 1 else "years"
+    month_text = "month" if months == 1 else "months"
+    
+    return f"{years} {year_text} {months} {month_text}"
+
 
 def calculate_years_in_business(created_at: datetime) -> str:
     """
     Calculate years and months in business from created_at timestamp.
-    Returns format: yyyy:mm
+    Returns format: "X years Y months"
     """
     if not created_at:
-        return "0:00"
+        return "0 years 0 months"
     
     now = datetime.now(created_at.tzinfo) if created_at.tzinfo else datetime.now()
     
@@ -41,7 +223,11 @@ def calculate_years_in_business(created_at: datetime) -> str:
             years -= 1
             months = 11
     
-    return f"{years}:{months:02d}"
+    # Format the response
+    year_text = "year" if years == 1 else "years"
+    month_text = "month" if months == 1 else "months"
+    
+    return f"{years} {year_text} {months} {month_text}"
 
 
 @router.get("/details", response_model=dict)
@@ -197,8 +383,27 @@ async def get_all_vendor_details(db: AsyncSession = Depends(get_db)):
         product_count_result = await db.execute(product_count_stmt)
         total_products = product_count_result.scalar() or 0
         
-        # Calculate years in business from created_at
-        years_in_business = calculate_years_in_business(vendor.created_at)
+        # Calculate years in business from ABN registration date
+        years_in_business = "0 years 0 months"  # Default value
+        
+        if business_profile and business_profile.abn_id:
+            try:
+                # Decrypt ABN ID to get the actual ABN number  
+                decrypted_abn = decrypt_data(business_profile.abn_id)
+                abn_registration_date = await fetch_abn_registration_date(decrypted_abn)
+                
+                if abn_registration_date:
+                    years_in_business = calculate_years_in_business_from_abn(abn_registration_date)
+                else:
+                    # Fallback to account creation date if ABN date not available
+                    years_in_business = calculate_years_in_business(vendor.created_at)
+            except Exception as e:
+                print(f"Error calculating ABN-based years in business for vendor {vendor.user_id}: {e}")
+                # Fallback to account creation date
+                years_in_business = calculate_years_in_business(vendor.created_at)
+        else:
+            # No business profile or ABN, use account creation date
+            years_in_business = calculate_years_in_business(vendor.created_at)
         
         vendor_details = VendorDetailsResponse(
             vendor_id=vendor.user_id,
