@@ -32,22 +32,30 @@ def generate_password_reset_token(expires_in_minutes: int = 60) -> Tuple[str, da
 async def create_password_reset_record(
     db: AsyncSession, user_id: str, token: str, expires_at: datetime
 ) -> None:
-    """Create a password reset record in the database."""
-    # First, mark any existing unused tokens as used
-    await db.execute(
-        update(PasswordReset)
-        .where(PasswordReset.user_id == user_id, PasswordReset.is_used == False)
-        .values(is_used=True, used_at=datetime.now(timezone.utc))
-    )
+    """Create or update password reset record in the database - no duplicates allowed."""
     
-    # Create new password reset record
-    password_reset = PasswordReset(
-        user_id=user_id,
-        token=token,
-        expires_at=expires_at,
-        is_used=False
-    )
-    db.add(password_reset)
+    # Check if user already has a password reset record
+    stmt = select(PasswordReset).where(PasswordReset.user_id == user_id)
+    result = await db.execute(stmt)
+    existing_record = result.scalar_one_or_none()
+    
+    if existing_record:
+        # Update existing record with new token and reset status
+        existing_record.token = token
+        existing_record.expires_at = expires_at
+        existing_record.is_used = False
+        existing_record.used_at = None
+        existing_record.created_at = datetime.now(timezone.utc)
+    else:
+        # Create new password reset record only if none exists
+        password_reset = PasswordReset(
+            user_id=user_id,
+            token=token,
+            expires_at=expires_at,
+            is_used=False
+        )
+        db.add(password_reset)
+    
     await db.commit()
 
 
@@ -84,12 +92,13 @@ async def validate_reset_token(
 
 
 async def mark_password_reset_used(db: AsyncSession, user_id: str) -> None:
-    """Mark all password reset tokens for a user as used."""
+    """Mark the password reset token for a user as used and nullify token."""
     await db.execute(
         update(PasswordReset)
-        .where(PasswordReset.user_id == user_id, PasswordReset.is_used == False)
-        .values(is_used=True, used_at=datetime.now(timezone.utc))
+        .where(PasswordReset.user_id == user_id)
+        .values(is_used=True, used_at=datetime.now(timezone.utc), token=None)
     )
+    await db.commit()
 
 
 def user_not_found_response():

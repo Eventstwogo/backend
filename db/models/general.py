@@ -194,9 +194,9 @@ class UserPasswordReset(Base):
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(
-        ForeignKey("users.user_id"), nullable=False
+        ForeignKey("users.user_id"), nullable=False, unique=True
     )
-    token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True)
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

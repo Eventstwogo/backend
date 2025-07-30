@@ -363,6 +363,34 @@ class EmailTemplateService:
             context=context
         )
     
+    def send_vendor_employee_credentials_email(
+        self,
+        email: EmailStr,
+        username: str,
+        password: str,
+        role_name: str,
+        business_name: Optional[str] = None,
+        vendor_portal_url: Optional[str] = None
+    ) -> bool:
+        """Send credentials email to new vendor employee"""
+        context = {
+            'username': username,
+            'email': email,
+            'password': password,
+            'role_name': role_name,
+            'business_name': business_name,
+            'vendor_portal_url': vendor_portal_url or f"{settings.FRONTEND_URL}/vendor",
+            'creation_date': datetime.now(tz=timezone.utc).strftime("%B %d, %Y at %I:%M %p UTC"),
+            'header_subtitle': 'Your vendor employee account is ready'
+        }
+        
+        return self.send_template_email(
+            to_email=email,
+            subject="Welcome to the Vendor Team - Shoppersky 👤",
+            template_name="vendor_employee_credentials_email.html",
+            context=context
+        )
+    
     def send_custom_email(
         self,
         to_email: EmailStr,

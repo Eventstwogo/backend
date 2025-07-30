@@ -173,7 +173,7 @@ async def login_user(
         # We can't log with user_id since user doesn't exist, so we'll use email hash
         await log_user_session(
             db=db,
-            user_id=f"unknown_{email_hash[:8]}",  # Use partial hash for tracking
+            user_id=f"UNK{email_hash[:3]}",  # Use 6-char tracking ID for failed logins
             request=request,
             login_success=False,
             failure_reason="User not found"

@@ -184,6 +184,63 @@ async def reset_password_with_token(
     )
 
 
+@router.post("/change-initial-password", status_code=status.HTTP_200_OK)
+@exception_handler
+async def change_initial_password(
+    email: str = Form(...),
+    new_password: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Change initial password for a vendor by email"""
+    
+    # Normalize email
+    email = email.strip().lower()
+    
+    # Step 1: Check if vendor exists
+    vendor = await get_vendor_by_email(db, email)
+    if not vendor:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Vendor with this email address not found.",
+        )
+    
+    # Step 2: Check if vendor account is active (False = active, True = inactive)
+    if vendor.is_active:  # True means account is inactive
+        return api_response(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Account is inactive. Cannot change password.",
+        )
+    
+    # Step 3: Validate new password format
+    validation_result = validate_password(new_password)
+    if validation_result["status_code"] != 200:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=validation_result["message"],
+        )
+    
+    # Step 4: Prevent using the same password as current password
+    if verify_password(new_password, vendor.password):
+        return api_response(
+            status_code=status.HTTP_409_CONFLICT,
+            message="New password cannot be the same as current password.",
+        )
+    
+    # Step 5: Update the password
+    vendor.password = hash_password(new_password)
+    vendor.login_status = 0  # Normal login status
+    vendor.login_failed_attempts = 0  # Reset login attempts
+    vendor.locked_time = None  # Clear lock timestamp if any
+    
+    await db.commit()
+    await db.refresh(vendor)
+    
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Initial password has been changed successfully.",
+    )
+
+
 @router.post("/change-password", status_code=status.HTTP_200_OK)
 @exception_handler
 async def change_password(

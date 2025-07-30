@@ -61,3 +61,10 @@ class ResendVerificationRequest(BaseModel):
         description="Email address to resend verification to."
     )
  
+# Schema for store name availability check
+class StoreNameCheckRequest(BaseModel):
+    store_name: str
+
+class StoreNameCheckResponse(BaseModel):
+    status_code: int
+    message: str
