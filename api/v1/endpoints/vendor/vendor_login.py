@@ -133,7 +133,7 @@ async def login_user(
 
     token_data = {
         "userId": user.user_id,
-        "bprofileId": user.business_profile_id,
+       
     }
 
     access_token = create_access_token(data=token_data)
