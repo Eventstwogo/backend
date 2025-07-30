@@ -17,7 +17,7 @@ class PaymentPreferenceEnum(str, Enum):
     orders = "Payments for Orders"
 
 class OnboardingRequest(BaseModel):
-    profile_ref_id: str = Field(..., min_length=1, max_length=6)
+    vendor_id: str = Field(..., min_length=1, max_length=6)
     purpose: list[PurposeEnum]
     payment_preference: list[PaymentPreferenceEnum]
     store_name: str = Field(..., min_length=3, max_length=100)

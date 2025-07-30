@@ -44,15 +44,15 @@ async def vendor_onboarding(
     db: AsyncSession = Depends(get_db)
 ) -> JSONResponse:
     try:
-        # Validate profile_ref_id exists
-        profile_check_stmt = select(VendorLogin).where(
-            VendorLogin.business_profile_id == data.profile_ref_id
+        # Validate vendor_id exists
+        vendor_check_stmt = select(VendorLogin).where(
+            VendorLogin.user_id == data.vendor_id
         )
-        profile_result = await db.execute(profile_check_stmt)
-        existing_profile = profile_result.scalar_one_or_none()
+        vendor_result = await db.execute(vendor_check_stmt)
+        existing_profile = vendor_result.scalar_one_or_none()
 
         if not existing_profile:
-            return JSONResponse(status_code=404, content={"message": "Invalid profile reference ID. Profile not found."})
+            return JSONResponse(status_code=404, content={"message": "Invalid vendor ID. Vendor not found."})
 
         # Validate industry_id exists
         industry_check_stmt = select(Industries).where(
@@ -132,7 +132,7 @@ async def vendor_onboarding(
 
         # Create new BusinessProfile instance
         new_profile = BusinessProfile(
-            profile_ref_id=data.profile_ref_id,
+            profile_ref_id=existing_profile.business_profile_id,
             abn_id=encrypted_abn_id,
             abn_hash=abn_hash,
             profile_details=encrypted_profile_json,
@@ -173,9 +173,7 @@ async def vendor_onboarding(
             status_code=201,
             content={
                 "message": "Vendor onboarding completed successfully. Confirmation email sent.",
-                "reference_number": ref_number,
-                "profile_ref_id": data.profile_ref_id,
-                "store_url": str(data.store_url)
+                "reference_number": ref_number
             }
         )
 
