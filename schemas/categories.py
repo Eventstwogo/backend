@@ -37,3 +37,20 @@ class CategoryOut(BaseModel):
     subcategories: List[SubCategoryOut] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MenuSubCategoryOut(BaseModel):
+    subcategory_id: str
+    subcategory_name: str
+    subcategory_slug: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MenuCategoryOut(BaseModel):
+    category_id: str
+    category_name: str
+    category_slug: str
+    subcategories: List[MenuSubCategoryOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
