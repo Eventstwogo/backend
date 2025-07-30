@@ -42,8 +42,8 @@ class OnboardingRequest(BaseModel):
     @field_validator('store_name')
     @classmethod
     def validate_store_name(cls, v):
-        if not re.match(r"^[a-zA-Z0-9 _\-']+$", v):
-            raise ValueError("Store name contains invalid characters")
+        if not re.match(r"^[a-zA-Z _\-']+$", v):
+            raise ValueError("Store name contains invalid characters. Numbers are not allowed.")
         return v
 
     @field_validator('location')

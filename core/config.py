@@ -37,9 +37,9 @@ class Settings(BaseSettings):
     POSTGRES_DRIVER: str = "asyncpg"
     POSTGRES_SCHEME: str = "postgresql"
     POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5433
+    POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_PASSWORD: str = "sai123"
     POSTGRES_DB: str = "shoppersky"
 
     @property
@@ -96,15 +96,14 @@ class Settings(BaseSettings):
 
     # === Email ===
     SMTP_TLS: bool = True
-    SMTP_PORT: int = 587
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_USER: str = "your-email@gmail.com"
-    SMTP_PASSWORD: str = "your-smtp-password"
-    EMAIL_FROM: str = "your-email@gmail.com"
-    EMAIL_FROM_NAME: str = "Shoppersky API"
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_USER: str = os.getenv("SMTP_USER", "your-email@gmail.com")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "your-smtp-password")
+    EMAIL_FROM: str = os.getenv("EMAIL_FROM", "your-email@gmail.com")
+    EMAIL_FROM_NAME: str = os.getenv("EMAIL_FROM_NAME", "Shoppersky API")
     EMAIL_TEMPLATES_DIR: str = "templates"
     SUPPORT_EMAIL: str = "support@shoppersky.com"
- 
 
     # === JWT ===
     JWT_ALGORITHM: str = "RS256"

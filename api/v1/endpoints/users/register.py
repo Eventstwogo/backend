@@ -194,7 +194,6 @@ async def verify_user_email(
             status_code=status.HTTP_200_OK,
             message="Email already verified.",
             data=UserVerificationResponse(
-                message="Email already verified.",
                 user_id=user.user_id,
             ),
         )
@@ -218,7 +217,6 @@ async def verify_user_email(
             status_code=status.HTTP_200_OK,
             message="Email already verified.",
             data=UserVerificationResponse(
-                message="Email already verified.",
                 user_id=user.user_id,
             ),
         )
@@ -264,7 +262,6 @@ async def verify_user_email(
         status_code=status.HTTP_200_OK,
         message="Email verified successfully. You can now log in.",
         data=UserVerificationResponse(
-            message="Email verified successfully. You can now log in.",
             user_id=user.user_id,
         ),
     )
@@ -379,7 +376,6 @@ async def resend_verification_email(
         status_code=status.HTTP_200_OK,
         message="Verification email resent successfully.",
         data=ResendVerificationResponse(
-            message="Verification email has been sent to your email address.",
             email=request_data.email,
         ),
     )

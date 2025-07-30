@@ -121,3 +121,14 @@ def encrypt_dict_values(data: dict) -> dict:
 
 def decrypt_dict_values(data: dict) -> dict:
     return {key: decrypt_data(value) for key, value in data.items()}
+
+def generate_employee_business_profile_id() -> str:
+    """
+    Generate a business profile ID for employees with format 'sho' + 3 random digits.
+    
+    Returns:
+        str: A business profile ID in format 'shoXXX' where XXX are random digits.
+    """
+    # Generate 3 random digits
+    random_digits = ''.join(secrets.choice(string.digits) for _ in range(3))
+    return f"sho{random_digits}"

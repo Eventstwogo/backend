@@ -431,9 +431,9 @@ class UserVerificationRequest(BaseModel):
 class UserVerificationResponse(BaseModel):
     """Schema for user email verification response."""
     
-    message: str = Field(
-        ...,
-        title="Message",
+    message: str | None = Field(
+        None,
+        title="Message", 
         description="Verification success message.",
     )
     user_id: str = Field(
@@ -474,8 +474,8 @@ class ResendVerificationRequest(BaseModel):
 class ResendVerificationResponse(BaseModel):
     """Schema for resend verification email response."""
     
-    message: str = Field(
-        ...,
+    message: str | None = Field(
+        None,
         title="Message",
         description="Resend verification success message.",
     )
