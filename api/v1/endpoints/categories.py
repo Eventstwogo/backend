@@ -21,7 +21,7 @@ from core.api_response import api_response
 from core.status_codes import APIResponse, StatusCode
 from db.models.superadmin import Category, SubCategory, Industries
 from db.sessions.database import get_db
-from schemas.categories import CategoryOut
+from schemas.categories import CategoryOut, MenuCategoryOut, MenuSubCategoryOut
 from services.category_service import (
     check_category_description_exists,
     check_category_meta_title_exists,
@@ -468,4 +468,59 @@ async def total_categories_count(
                 "category_distribution": category_distribution,
             },
         },
+    )
+
+
+
+@router.get("/menu-categories", response_model=List[MenuCategoryOut])
+@exception_handler
+async def get_menu_categories(
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get all categories and their subcategories for menu display.
+    Returns cat_id, cat_name, cat_slug and their subcat_id, subcat_name, subcat_slug.
+    """
+    # Fetch all categories with their subcategories
+    # Note: category_status False = active, True = inactive (based on analytics endpoint)
+    # Also filter by show_in_menu for menu display
+    stmt = (
+        select(Category)
+        .options(selectinload(Category.subcategories))
+        .where(
+            Category.category_status == False,  # Active categories
+            Category.show_in_menu == True       # Show in menu
+        )
+    )
+    result = await db.execute(stmt)
+    categories = result.scalars().all()
+
+    # Transform the data to match the required format
+    menu_categories = []
+    for category in categories:
+        # Filter subcategories: active and show in menu
+        subcategories = [
+            MenuSubCategoryOut(
+                subcategory_id=subcat.subcategory_id,
+                subcategory_name=subcat.subcategory_name,
+                subcategory_slug=subcat.subcategory_slug
+            )
+            for subcat in category.subcategories
+            if (subcat.subcategory_status == False and  # Active subcategories
+                subcat.show_in_menu == True)            # Show in menu
+        ]
+        
+        menu_categories.append(
+            MenuCategoryOut(
+                category_id=category.category_id,
+                category_name=category.category_name,
+                category_slug=category.category_slug,
+                subcategories=subcategories
+            )
+        )
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Menu categories fetched successfully",
+        data=menu_categories,
     )
