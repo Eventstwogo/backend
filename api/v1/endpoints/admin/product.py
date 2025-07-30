@@ -223,6 +223,11 @@ async def get_all_products(db: AsyncSession = Depends(get_db)):
                 product.subcategory.subcategory_name if product.subcategory else None
             )
 
+            # Process image URLs
+            if product.images and "urls" in product.images:
+                image_urls = [get_media_url(url) for url in product.images["urls"]]
+                product_data["images"] = {"urls": image_urls}
+
             product_responses.append(ProductResponse(**product_data))
 
         return ProductListResponse(products=product_responses, total_count=total_count)
@@ -254,6 +259,12 @@ async def get_product_by_id(product_id: str, db: AsyncSession = Depends(get_db))
         subcategory_result = await db.execute(select(SubCategory.subcategory_name).where(SubCategory.subcategory_id == product.subcategory_id))
         subcategory_name = subcategory_result.scalar()
 
+        # Process image URLs
+        processed_images = product.images
+        if product.images and "urls" in product.images:
+            image_urls = [get_media_url(url) for url in product.images["urls"]]
+            processed_images = {"urls": image_urls}
+
         # Build and return ProductResponse
         product_response = ProductResponse(
             product_id=product.product_id,
@@ -264,7 +275,7 @@ async def get_product_by_id(product_id: str, db: AsyncSession = Depends(get_db))
             pricing=product.pricing,
             inventory=product.inventory,
             physical_attributes=product.physical_attributes,
-            images=product.images,
+            images=processed_images,
             tags_and_relationships=product.tags_and_relationships,
             status_flags=product.status_flags,
             timestamp=product.timestamp,
@@ -305,6 +316,12 @@ async def get_product_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
                 log_error=False,
             )
 
+        # Process image URLs
+        processed_images = product.images
+        if product.images and "urls" in product.images:
+            image_urls = [get_media_url(url) for url in product.images["urls"]]
+            processed_images = {"urls": image_urls}
+
         return ProductResponse(
             product_id=product.product_id,
             vendor_id=product.vendor_id,
@@ -314,7 +331,7 @@ async def get_product_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
             pricing=product.pricing,
             inventory=product.inventory,
             physical_attributes=product.physical_attributes,
-            images=product.images,
+            images=processed_images,
             tags_and_relationships=product.tags_and_relationships,
             status_flags=product.status_flags,
             timestamp=product.timestamp,
