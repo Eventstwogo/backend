@@ -1,7 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import case, func
+from sqlalchemy import case, delete, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -48,7 +48,35 @@ async def add_vendor_category_mapping(
                 )
             )
 
-    # 3. Save to VendorCategoryManagement
+    # 3. Check for existing (vendor, category, subcategory) combination
+    check_full_stmt = select(VendorCategoryManagement).where(
+        VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
+        VendorCategoryManagement.category_id == payload.category_id,
+        VendorCategoryManagement.subcategory_id == payload.subcategory_id
+    )
+    full_result = await db.execute(check_full_stmt)
+    if full_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This vendor-category-subcategory mapping already exists."
+        )
+
+    # 4. Check for existing (vendor, category) mapping regardless of subcategory
+    check_partial_stmt = select(VendorCategoryManagement).where(
+        VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
+        VendorCategoryManagement.category_id == payload.category_id,
+        VendorCategoryManagement.subcategory_id.is_(None)
+        if payload.subcategory_id is not None
+        else VendorCategoryManagement.subcategory_id.isnot(None)
+    )
+    partial_result = await db.execute(check_partial_stmt)
+    if partial_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A conflicting vendor-category mapping already exists."
+        )
+
+    # 5. Save to VendorCategoryManagement
     new_entry = VendorCategoryManagement(
         vendor_ref_id=payload.vendor_ref_id,
         category_id=payload.category_id,
@@ -62,7 +90,7 @@ async def add_vendor_category_mapping(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Failed to add vendor-category mapping: " + str(e)
         )
 
     return {
@@ -70,6 +98,49 @@ async def add_vendor_category_mapping(
         "message": "Vendor category mapping added successfully."
     }
 
+
+
+@router.post("/remove")
+async def remove_vendor_category_mapping(
+    payload: VendorCategoryRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Removes a vendor's category or subcategory mapping.
+    - If subcategory_id is provided, removes the specific subcategory mapping.
+    - If subcategory_id is not provided, removes the category mapping only (subcategory_id is NULL or empty string).
+    """
+    if payload.subcategory_id:
+        # Remove subcategory mapping
+        delete_stmt = delete(VendorCategoryManagement).where(
+            VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
+            VendorCategoryManagement.category_id == payload.category_id,
+            VendorCategoryManagement.subcategory_id == payload.subcategory_id
+        )
+    else:
+        # Remove category-only mapping (NULL or empty string)
+        delete_stmt = delete(VendorCategoryManagement).where(
+            VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
+            VendorCategoryManagement.category_id == payload.category_id,
+            or_(
+                VendorCategoryManagement.subcategory_id.is_(None),
+                VendorCategoryManagement.subcategory_id == ""
+            )
+        )
+
+    result = await db.execute(delete_stmt)
+    await db.commit()
+
+    if result.rowcount == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Mapping not found or already removed."
+        )
+
+    return {
+        "status": "success",
+        "message": "Vendor category mapping removed successfully."
+    }
 
 
 
