@@ -8,7 +8,7 @@ from typing import Optional, Tuple
 
 from fastapi import status
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.api_response import api_response
@@ -40,36 +40,31 @@ async def create_password_reset_record(
     token: str,
     expires_at: datetime,
 ) -> None:
-    """Create a password reset record in the database."""
-    # First, invalidate any existing tokens for this user
-    await db.execute(
-        select(VendorPasswordReset)
-        .where(
-            and_(
-                VendorPasswordReset.user_id == user_id,
-                VendorPasswordReset.is_used == False,
-                VendorPasswordReset.expires_at > datetime.now(timezone.utc)
-            )
+    """Create or update password reset record in the database - no duplicates allowed."""
+    
+    # Check if user already has a password reset record
+    stmt = select(VendorPasswordReset).where(VendorPasswordReset.user_id == user_id)
+    result = await db.execute(stmt)
+    existing_record = result.scalar_one_or_none()
+    
+    if existing_record:
+        # Update existing record with new token and reset status
+        existing_record.token = token
+        existing_record.expires_at = expires_at
+        existing_record.is_used = False
+        existing_record.used_at = None
+        existing_record.created_at = datetime.now(timezone.utc)
+    else:
+        # Create new password reset record only if none exists
+        password_reset = VendorPasswordReset(
+            user_id=user_id,
+            token=token,
+            expires_at=expires_at,
+            is_used=False,
+            created_at=datetime.now(timezone.utc)
         )
-    )
+        db.add(password_reset)
     
-    # Mark existing tokens as used
-    existing_tokens = await db.execute(
-        select(VendorPasswordReset).where(VendorPasswordReset.user_id == user_id)
-    )
-    for existing_token in existing_tokens.scalars():
-        existing_token.is_used = True
-    
-    # Create new password reset record
-    password_reset = VendorPasswordReset(
-        user_id=user_id,
-        token=token,
-        expires_at=expires_at,
-        is_used=False,
-        created_at=datetime.now(timezone.utc)
-    )
-    
-    db.add(password_reset)
     await db.commit()
 
 
@@ -116,14 +111,12 @@ async def validate_reset_token(
 
 
 async def mark_password_reset_used(db: AsyncSession, user_id: str) -> None:
-    """Mark all password reset tokens for a user as used."""
-    result = await db.execute(
-        select(VendorPasswordReset).where(VendorPasswordReset.user_id == user_id)
+    """Mark the password reset token for a user as used and nullify token."""
+    await db.execute(
+        update(VendorPasswordReset)
+        .where(VendorPasswordReset.user_id == user_id)
+        .values(is_used=True, used_at=datetime.now(timezone.utc), token=None)
     )
-    
-    for reset_record in result.scalars():
-        reset_record.is_used = True
-    
     await db.commit()
 
 

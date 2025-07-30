@@ -9,13 +9,14 @@ import math
 
 from core.api_response import api_response
 from utils.id_generators import generate_digits_letters, hash_data, encrypt_data, decrypt_data, generate_employee_business_profile_id
-from db.models.superadmin import VendorLogin, Role
+from db.models.superadmin import VendorLogin, Role, BusinessProfile
 from schemas.vendor_employee import (
     VendorEmployeeCreateRequest, 
     VendorEmployeeUpdateRequest,
 )
 from db.sessions.database import get_db
 from utils.exception_handlers import exception_handler
+from services.email_service import EmailTemplateService
 
 def safe_decrypt_username(encrypted_username: str, fallback: str = None) -> str:
     """Safely decrypt username with fallback handling"""
@@ -154,6 +155,44 @@ async def create_vendor_employee(
     db.add(new_employee)
     await db.commit()
     await db.refresh(new_employee)
+    
+    # Send credentials email to the new employee
+    try:
+        email_service = EmailTemplateService()
+        
+        # Get vendor business name from BusinessProfile if available
+        vendor_business_name = None
+        try:
+            # Try to get business profile for the vendor
+            business_profile_stmt = select(BusinessProfile).where(
+                BusinessProfile.profile_ref_id == vendor.business_profile_id
+            )
+            business_profile_result = await db.execute(business_profile_stmt)
+            business_profile = business_profile_result.scalar_one_or_none()
+            
+            if business_profile and business_profile.store_name:
+                vendor_business_name = business_profile.store_name
+            else:
+                # Fallback to vendor username
+                vendor_business_name = decrypt_data(vendor.username) if vendor.username else None
+        except Exception:
+            vendor_business_name = None
+        
+        email_sent = email_service.send_vendor_employee_credentials_email(
+            email=employee_data.email,
+            username=employee_data.username,
+            password=generated_password,
+            role_name=role.role_name,
+            business_name=vendor_business_name
+        )
+        
+        if not email_sent:
+            # Log the email failure but don't fail the employee creation
+            print(f"Warning: Failed to send credentials email to {employee_data.email}")
+            
+    except Exception as e:
+        # Log the email error but don't fail the employee creation
+        print(f"Error sending credentials email: {str(e)}")
     
     return api_response(
         status_code=status.HTTP_201_CREATED,

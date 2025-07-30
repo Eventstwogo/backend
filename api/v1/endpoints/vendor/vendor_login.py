@@ -7,21 +7,14 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 
 from utils.id_generators import hash_data
-from db.models.superadmin import BusinessProfile, VendorLogin, VendorSignup, Config
+from db.models.superadmin import BusinessProfile, VendorLogin, VendorSignup
 from schemas.admin_user import AdminLoginRequest, AdminLoginResponse, AdminUserInfo
 from db.sessions.database import get_db
 from utils.jwt import create_access_token
+from schemas.vendor_onboarding import StoreNameCheckRequest, StoreNameCheckResponse
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 router = APIRouter()
-
-# Schema for store name availability check
-class StoreNameCheckRequest(BaseModel):
-    store_name: str
-
-class StoreNameCheckResponse(BaseModel):
-    status_code: int
-    message: str
 
 
 

@@ -28,7 +28,7 @@
         }
         
         .header {
-            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
             color: white;
             padding: 30px 20px;
             text-align: center;
@@ -65,7 +65,7 @@
         
         .info-box {
             background-color: #f8f9fa;
-            border-left: 4px solid #27ae60;
+            border-left: 4px solid #3498db;
             padding: 20px;
             margin: 25px 0;
             border-radius: 5px;
@@ -79,7 +79,7 @@
         
         .button {
             display: inline-block;
-            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
             color: white;
             padding: 15px 30px;
             text-decoration: none;
@@ -97,8 +97,8 @@
         }
         
         .verification-code {
-            background-color: #e8f5e8;
-            border: 2px dashed #27ae60;
+            background-color: #e8f4fd;
+            border: 2px dashed #3498db;
             border-radius: 10px;
             padding: 20px;
             text-align: center;
@@ -106,7 +106,7 @@
         }
         
         .verification-code h3 {
-            color: #27ae60;
+            color: #3498db;
             margin-bottom: 15px;
             font-size: 18px;
         }
@@ -190,7 +190,7 @@
         }
         
         .step-number {
-            background-color: #27ae60;
+            background-color: #3498db;
             color: white;
             width: 30px;
             height: 30px;
@@ -257,49 +257,9 @@
                 <a href="{{ verification_link }}" class="button">Verify My Account</a>
             </div>
             
-            <div class="message" style="text-align: center; margin: 20px 0;">
-                <p><strong>OR</strong></p>
-            </div>
-            
-            <div class="verification-code">
-                <h3>🔢 Enter this verification code:</h3>
-                <div class="code">{{ verification_code }}</div>
-                <p style="color: #666; font-size: 14px; margin-top: 10px;">
-                    Copy and paste this code into the verification form
-                </p>
-            </div>
-            
             <div class="expiry-warning">
                 <h4>⏰ Time Sensitive</h4>
-                <p>This verification code will expire in {{ expiry_minutes }} minutes.</p>
-            </div>
-            
-            <div class="steps">
-                <h3>📋 How to verify your account:</h3>
-                <div class="step">
-                    <div class="step-number">1</div>
-                    <div class="step-text">Click the "Verify My Account" button above, or</div>
-                </div>
-                <div class="step">
-                    <div class="step-number">2</div>
-                    <div class="step-text">Copy the verification code and paste it in the verification form</div>
-                </div>
-                <div class="step">
-                    <div class="step-number">3</div>
-                    <div class="step-text">Complete the verification process to activate your account</div>
-                </div>
-            </div>
-            
-            <div class="info-box">
-                <h3>🎯 Why verify your account?</h3>
-                <p style="color: #555; margin-bottom: 10px;">• Secure your account and protect your personal information</p>
-                <p style="color: #555; margin-bottom: 10px;">• Enable password recovery and account notifications</p>
-                <p style="color: #555; margin-bottom: 10px;">• Access all features and services on our platform</p>
-                <p style="color: #555;">• Ensure you receive important updates about your orders</p>
-            </div>
-            
-            <div class="message">
-                <p>If you didn't create an account with us, please ignore this email or contact our support team if you have concerns.</p>
+                <p>This verification link will expire in {{ expiry_minutes }} minutes.</p>
             </div>
         </div>
         
