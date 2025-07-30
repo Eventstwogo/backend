@@ -287,6 +287,82 @@ async def get_vendor_details(
 
 
 
+@router.get("/details/by-slug", response_model=dict)
+async def get_vendor_details(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+):
+    # Step 1: Fetch the business profile by slug
+    stmt = select(BusinessProfile).where(BusinessProfile.store_slug == slug)
+    result = await db.execute(stmt)
+    business_profile = result.scalar_one_or_none()
+ 
+    if not business_profile:
+        raise HTTPException(status_code=404, detail="Business profile not found")
+ 
+    # Step 2: Get the vendor login using business_profile.profile_ref_id
+    vendor_stmt = select(VendorLogin).where(
+        VendorLogin.business_profile_id == business_profile.profile_ref_id
+    )
+    vendor_result = await db.execute(vendor_stmt)
+    vendor = vendor_result.scalar_one_or_none()
+ 
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor login not found")
+ 
+    # Step 3: Decrypt profile details if present
+    decrypted_profile_details = {}
+    if business_profile.profile_details:
+        try:
+            raw_data = business_profile.profile_details
+            if isinstance(raw_data, str):
+                raw_data = json.loads(raw_data)
+            decrypted_profile_details = decrypt_dict_values(raw_data)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to decrypt profile details: {str(e)}")
+   
+    # Calculate years in business from ABN registration date
+        years_in_business = "0 years 0 months"  # Default value
+       
+        if business_profile and business_profile.abn_id:
+            try:
+                # Decrypt ABN ID to get the actual ABN number  
+                decrypted_abn = decrypt_data(business_profile.abn_id)
+                abn_registration_date = await fetch_abn_registration_date(decrypted_abn)
+               
+                if abn_registration_date:
+                    years_in_business = calculate_years_in_business_from_abn(abn_registration_date)
+                else:
+                    # Fallback to account creation date if ABN date not available
+                    years_in_business = calculate_years_in_business(vendor.created_at)
+            except Exception as e:
+                print(f"Error calculating ABN-based years in business for vendor {vendor.user_id}: {e}")
+                # Fallback to account creation date
+                years_in_business = calculate_years_in_business(vendor.created_at)
+        else:
+            # No business profile or ABN, use account creation date
+            years_in_business = calculate_years_in_business(vendor.created_at)
+ 
+    return {
+        "vendor_login": {
+            "user_id": vendor.user_id,
+            "email": vendor.email,
+            "is_verified": vendor.is_verified,
+            "is_active": vendor.is_active,
+            "last_login": vendor.last_login,
+            "created_at": vendor.created_at,
+        },
+        "business_profile": {
+            "store_name": business_profile.store_name,
+            "industry": business_profile.industry,
+            "location": business_profile.location,
+            "is_approved": business_profile.is_approved,
+            "profile_details": decrypted_profile_details,
+            "purpose": business_profile.purpose,
+            "years_in_bussiness":years_in_business,
+        },
+    }
+
 
 @router.get("/vendors/all", response_model=list[dict])
 async def get_all_vendors(db: AsyncSession = Depends(get_db)):
