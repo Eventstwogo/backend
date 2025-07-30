@@ -90,6 +90,7 @@ async def get_business_profile(
         "location": profile.location,
         "payment_preference": profile.payment_preference,
         "store_name": profile.store_name,
+        "store_slug": profile.store_slug,
         "store_url": profile.store_url,
         "industry": profile.industry,
         "ref_number": profile.ref_number,

@@ -276,6 +276,7 @@ async def get_vendor_details(
         },
         "business_profile": {
             "store_name": business_profile.store_name if business_profile else None,
+            "store_slug": business_profile.store_slug if business_profile else None,
             "industry": business_profile.industry if business_profile else None,
             "location": business_profile.location if business_profile else None,
             "is_approved": business_profile.is_approved if business_profile else None,
@@ -331,6 +332,7 @@ async def get_all_vendors(db: AsyncSession = Depends(get_db)):
             },
             "business_profile": {
                 "store_name": business_profile.store_name if business_profile else None,
+                "store_slug": business_profile.store_slug if business_profile else None,
                 "industry_id": business_profile.industry if business_profile else None,
                 "industry_name": industry_name,
                 "location": business_profile.location if business_profile else None,
@@ -408,6 +410,7 @@ async def get_all_vendor_details(db: AsyncSession = Depends(get_db)):
         vendor_details = VendorDetailsResponse(
             vendor_id=vendor.user_id,
             store_name=business_profile.store_name if business_profile else None,
+            store_slug=business_profile.store_slug if business_profile else None,
             location=business_profile.location if business_profile else None,
             business_logo=business_profile.business_logo if business_profile else None,
             store_logo=business_profile.business_logo if business_profile else None,  # Using business_logo as store_logo
@@ -426,24 +429,34 @@ async def get_all_vendor_details(db: AsyncSession = Depends(get_db)):
 
 @router.get("/vendor-products-categories", response_model=VendorProductsAndCategoriesResponse)
 async def get_vendor_products_and_categories(
-    vendor_id: str,
+    store_slug: str,
     db: AsyncSession = Depends(get_db)
 ):
 
-    # First, verify the vendor exists and get business profile
+    # First, find the business profile using store_slug
+    business_profile_stmt = select(BusinessProfile).where(
+        BusinessProfile.store_slug == store_slug
+    )
+    business_profile_result = await db.execute(business_profile_stmt)
+    business_profile = business_profile_result.scalar_one_or_none()
+    
+    if not business_profile:
+        raise HTTPException(status_code=404, detail=f"Store not found with slug: {store_slug}")
+    
+    # Get the vendor using the business profile
     vendor_stmt = select(VendorLogin).options(
         joinedload(VendorLogin.business_profile)
-    ).where(VendorLogin.user_id == vendor_id)
+    ).where(VendorLogin.business_profile_id == business_profile.profile_ref_id)
     vendor_result = await db.execute(vendor_stmt)
     vendor = vendor_result.scalar_one_or_none()
     
     if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
+        raise HTTPException(status_code=404, detail=f"Vendor not found for store: {store_slug}")
     
     # Get vendor's products with category information
     products_stmt = select(Product, Category).join(
         Category, Product.category_id == Category.category_id
-    ).where(Product.vendor_id == vendor_id)
+    ).where(Product.vendor_id == vendor.user_id)
     
     products_result = await db.execute(products_stmt)
     products_data = products_result.all()
@@ -468,14 +481,14 @@ async def get_vendor_products_and_categories(
             "status_flags": product.status_flags or {},
         })
     
-    # Get store name from business profile
-    store_name = None
-    if vendor.business_profile:
-        store_name = vendor.business_profile.store_name
+    # Get store name and slug from business profile
+    store_name = business_profile.store_name
+    store_slug_response = business_profile.store_slug
     
     return VendorProductsAndCategoriesResponse(
-        vendor_id=vendor_id,
+        vendor_id=vendor.user_id,
         store_name=store_name,
+        store_slug=store_slug_response,
         products=products_info,
         total_products=len(products_info)
     )

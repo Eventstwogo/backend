@@ -12,7 +12,7 @@ from schemas.products import ProductResponse, ProductListResponse
 from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.status_codes import APIResponse, StatusCode
-from db.models.superadmin import Category, SubCategory, Product, VendorLogin
+from db.models.superadmin import Category, SubCategory, Product, VendorLogin, BusinessProfile
 from db.sessions.database import get_db
 from sqlalchemy.future import select
 from sqlalchemy import func
@@ -332,26 +332,53 @@ async def get_product_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
         )
 
 
-@router.get("/by-vendor/{vendor_id}", response_model=List[ProductResponse])
-async def get_products_by_vendor_id(
-    vendor_id: str,
+@router.get("/by-vendor/{store_slug}", response_model=List[ProductResponse])
+async def get_products_by_store_slug(
+    store_slug: str,
     db: AsyncSession = Depends(get_db),
 ):
     try:
+        # First, find the vendor_id using the store_slug
+        business_profile_result = await db.execute(
+            select(BusinessProfile)
+            .filter(BusinessProfile.store_slug == store_slug)
+        )
+        business_profile = business_profile_result.scalar_one_or_none()
+        
+        if not business_profile:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No store found with slug: {store_slug}"
+            )
+        
+        # Get the vendor_id from the business profile
+        vendor_result = await db.execute(
+            select(VendorLogin)
+            .filter(VendorLogin.business_profile_id == business_profile.profile_ref_id)
+        )
+        vendor = vendor_result.scalar_one_or_none()
+        
+        if not vendor:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No vendor found for store slug: {store_slug}"
+            )
+        
+        # Now get products using the vendor_id
         result = await db.execute(
             select(Product)
             .options(
                 selectinload(Product.category),
                 selectinload(Product.subcategory),
             )
-            .filter(Product.vendor_id == vendor_id)
+            .filter(Product.vendor_id == vendor.user_id)
         )
         products = result.scalars().all()
 
         if not products:
             raise HTTPException(
                 status_code=404,
-                detail=f"No products found for vendor ID {vendor_id}"
+                detail=f"No products found for store: {store_slug}"
             )
 
         # Map products into the correct response model
