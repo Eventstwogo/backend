@@ -372,6 +372,8 @@ async def get_categories_and_subcategories_by_status(
 
     for category in categories:
         category.category_name = category.category_name.title()
+        # Process category image URL
+        category.category_img_thumbnail = get_media_url(category.category_img_thumbnail)
 
         if category.category_status:
             # If category is active, override subcategory status to True in response
@@ -380,6 +382,8 @@ async def get_categories_and_subcategories_by_status(
 
         for sub in category.subcategories:
             sub.subcategory_name = sub.subcategory_name.title()
+            # Process subcategory image URL
+            sub.subcategory_img_thumbnail = get_media_url(sub.subcategory_img_thumbnail)
 
     return api_response(
         status_code=status.HTTP_200_OK,
