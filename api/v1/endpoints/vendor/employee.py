@@ -8,7 +8,7 @@ from starlette.responses import JSONResponse
 import math
 
 from core.api_response import api_response
-from utils.id_generators import generate_digits_letters, hash_data, encrypt_data, decrypt_data
+from utils.id_generators import generate_digits_letters, hash_data, encrypt_data, decrypt_data, generate_employee_business_profile_id
 from db.models.superadmin import VendorLogin, Role
 from schemas.vendor_employee import (
     VendorEmployeeCreateRequest, 
@@ -107,19 +107,15 @@ async def create_vendor_employee(
             break
         user_id = generate_digits_letters(6)
     
-    # For employees, use "000000" as business_profile_id (indicating no business profile)
-    # Since it needs to be unique, we'll use "000000" if available, otherwise "000001", "000002", etc.
-    business_profile_id = "000000"
-    counter = 0
-    
+    # For employees, generate business_profile_id with format "sho" + 3 random digits
     # Ensure business_profile_id is unique
     while True:
+        business_profile_id = generate_employee_business_profile_id()
         biz_check_stmt = select(VendorLogin).where(VendorLogin.business_profile_id == business_profile_id)
         biz_check_result = await db.execute(biz_check_stmt)
         if not biz_check_result.scalar_one_or_none():
             break
-        counter += 1
-        business_profile_id = f"{counter:06d}"  # Format as 6-digit number: 000001, 000002, etc.
+        # If the generated ID already exists, the loop will continue and generate a new one
     
     # Generate user_profile_id normally
     user_profile_id = generate_digits_letters(6)

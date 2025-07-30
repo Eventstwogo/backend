@@ -29,6 +29,8 @@ class VendorEmployeeCreateRequest(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v):
+        import re
+        
         v = normalize_whitespace(v)
         if not v:
             raise ValueError("Username cannot be empty.")
@@ -36,9 +38,19 @@ class VendorEmployeeCreateRequest(BaseModel):
             raise ValueError("Username must be at least 3 characters long.")
         if len(v) > 50:
             raise ValueError("Username must be at most 50 characters long.")
-        # Basic alphanumeric validation
-        if not v.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Username can only contain letters, numbers, hyphens, and underscores.")
+        
+        # Check if first 3 characters are letters
+        if len(v) >= 3 and not v[:3].replace(" ", "").isalpha():
+            raise ValueError("First 3 characters must be letters.")
+        
+        # Check if username contains only numbers (no letters)
+        if v.replace(" ", "").isdigit():
+            raise ValueError("Username cannot contain only numbers.")
+        
+        # Check for special characters (allow only letters, numbers, and spaces)
+        if not re.match(r"^[a-zA-Z0-9\s]+$", v):
+            raise ValueError("Username can only contain letters, numbers, and spaces.")
+        
         return v
 
     @field_validator("email")
@@ -89,6 +101,8 @@ class VendorEmployeeUpdateRequest(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v):
+        import re
+        
         if v is None:
             return v
         v = normalize_whitespace(v)
@@ -98,9 +112,19 @@ class VendorEmployeeUpdateRequest(BaseModel):
             raise ValueError("Username must be at least 3 characters long.")
         if len(v) > 50:
             raise ValueError("Username must be at most 50 characters long.")
-        # Basic alphanumeric validation
-        if not v.replace("_", "").replace("-", "").isalnum():
-            raise ValueError("Username can only contain letters, numbers, hyphens, and underscores.")
+        
+        # Check if first 3 characters are letters
+        if len(v) >= 3 and not v[:3].replace(" ", "").isalpha():
+            raise ValueError("First 3 characters must be letters.")
+        
+        # Check if username contains only numbers (no letters)
+        if v.replace(" ", "").isdigit():
+            raise ValueError("Username cannot contain only numbers.")
+        
+        # Check for special characters (allow only letters, numbers, and spaces)
+        if not re.match(r"^[a-zA-Z0-9\s]+$", v):
+            raise ValueError("Username can only contain letters, numbers, and spaces.")
+        
         return v
 
     @field_validator("email")

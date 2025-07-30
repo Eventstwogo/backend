@@ -9,7 +9,7 @@ from utils.file_uploads import get_media_url, save_uploaded_file
 from sqlalchemy.orm import selectinload
 from utils.id_generators import generate_lowercase
 from schemas.products import ProductResponse, ProductListResponse
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.status_codes import APIResponse, StatusCode
 from db.models.superadmin import Category, SubCategory, Product, VendorLogin
@@ -349,10 +349,9 @@ async def get_products_by_vendor_id(
         products = result.scalars().all()
 
         if not products:
-            return APIResponse.response(
-                StatusCode.NOT_FOUND,
-                f"No products found for vendor ID {vendor_id}",
-                log_error=False,
+            raise HTTPException(
+                status_code=404,
+                detail=f"No products found for vendor ID {vendor_id}"
             )
 
         # Map products into the correct response model
@@ -386,11 +385,13 @@ async def get_products_by_vendor_id(
 
         return response
 
+    except HTTPException:
+        # Re-raise HTTPException (like our 404) without modification
+        raise
     except Exception as e:
-        return APIResponse.response(
-            StatusCode.SERVER_ERROR,
-            f"Failed to retrieve products: {str(e)}",
-            log_error=True,
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve products: {str(e)}"
         )
 
 

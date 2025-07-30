@@ -45,7 +45,7 @@ async def approve_vendor(
 
 
 @router.post("/vendor/reject", response_model=dict)
-async def approve_vendor(
+async def reject_vendor(
     user_id: str,
     db: AsyncSession = Depends(get_db),
 ):
@@ -74,7 +74,7 @@ async def approve_vendor(
     db.add_all([vendor, business_profile])
     await db.commit()
 
-    return {"message": f"Vendor approved successfully"}
+    return {"message": f"Vendor rejected successfully"}
 
 
 

@@ -213,6 +213,29 @@ class PasswordReset(Base):
     user: Mapped["AdminUser"] = relationship(back_populates="password_resets")
 
 
+class VendorPasswordReset(Base):
+    __tablename__ = "ven_password_reset"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("ven_login.user_id"), nullable=False
+    )
+    token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    used_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+
+    # Relationships
+    vendor: Mapped["VendorLogin"] = relationship(back_populates="password_resets")
+
+
 class SessionLog(Base):
     __tablename__ = "session_log"
     
@@ -282,6 +305,10 @@ class VendorLogin(Base):
         back_populates="vendor_login",
         uselist=False,
         primaryjoin="VendorLogin.business_profile_id == foreign(BusinessProfile.profile_ref_id)"
+    )
+    
+    password_resets: Mapped[list["VendorPasswordReset"]] = relationship(
+        back_populates="vendor", cascade="all, delete-orphan"
     )
  
  

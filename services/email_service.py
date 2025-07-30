@@ -1,13 +1,13 @@
-import os
 import smtplib
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader, Template
-from pydantic import EmailStr, SecretStr
+from jinja2 import Environment, FileSystemLoader
+from pydantic import EmailStr
+
 
 from core.config import settings
 from core.logging_config import get_logger
@@ -332,6 +332,34 @@ class EmailTemplateService:
             to_email=vendor_email,
             subject="Verify Your Shoppersky Vendor Account",
             template_name="vendor_verification_email.html",
+            context=context
+        )
+    
+    def send_vendor_password_reset_email(
+        self,
+        email: str,
+        username: str,
+        reset_link: str,
+        expiry_minutes: int = 60,
+        ip_address: str = "Unknown",
+        request_time: str = None
+    ) -> bool:
+        """Send password reset email for vendor users"""
+        context = {
+            'username': username,
+            'reset_link': reset_link,
+            'expiry_minutes': expiry_minutes,
+            'ip_address': ip_address,
+            'request_time': request_time or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            'header_subtitle': 'Reset your vendor account password',
+            'is_vendor_account': True,  # Flag to distinguish from user/admin emails
+            'current_year': datetime.now(tz=timezone.utc).year
+        }
+        
+        return self.send_template_email(
+            to_email=email,
+            subject="Password Reset Request - Shoppersky Vendor 🔐",
+            template_name="vendor_password_reset_email.html",
             context=context
         )
     
