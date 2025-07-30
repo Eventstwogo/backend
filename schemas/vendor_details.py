@@ -43,9 +43,17 @@ class VendorProductInfo(BaseModel):
     status_flags: Dict[str, bool]
 
 
+class VendorCategoryManagementInfo(BaseModel):
+    category_id: str
+    category_name: str
+    subcategory_id: Optional[str] = None
+    subcategory_name: Optional[str] = None
+
+
 class VendorProductsAndCategoriesResponse(BaseModel):
     vendor_id: str
     store_name: Optional[str] = None
     store_slug: Optional[str] = None
     products: List[VendorProductInfo] = []
     total_products: int = 0
+    category_management: List[VendorCategoryManagementInfo] = []

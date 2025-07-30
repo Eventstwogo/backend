@@ -9,7 +9,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from utils.id_generators import decrypt_data, decrypt_dict_values
-from db.models.superadmin import BusinessProfile, VendorLogin, VendorCategoryManagement, Category, Product, Industries
+from db.models.superadmin import BusinessProfile, VendorLogin, VendorCategoryManagement, Category, SubCategory, Product, Industries
 from db.sessions.database import get_db
 from schemas.vendor_details import AllVendorsResponse, VendorDetailsResponse, VendorProductsAndCategoriesResponse
 
@@ -481,6 +481,32 @@ async def get_vendor_products_and_categories(
             "status_flags": product.status_flags or {},
         })
     
+    # Get vendor category management information
+    category_management_stmt = select(
+        VendorCategoryManagement,
+        Category,
+        SubCategory
+    ).join(
+        Category, VendorCategoryManagement.category_id == Category.category_id
+    ).outerjoin(
+        SubCategory, VendorCategoryManagement.subcategory_id == SubCategory.subcategory_id
+    ).where(
+        VendorCategoryManagement.vendor_ref_id == vendor.user_id
+    )
+    
+    category_management_result = await db.execute(category_management_stmt)
+    category_management_data = category_management_result.all()
+    
+    # Process category management information
+    category_management_info = []
+    for ven_cat_mgmt, category, subcategory in category_management_data:
+        category_management_info.append({
+            "category_id": category.category_id,
+            "category_name": category.category_name,
+            "subcategory_id": subcategory.subcategory_id if subcategory else None,
+            "subcategory_name": subcategory.subcategory_name if subcategory else None,
+        })
+    
     # Get store name and slug from business profile
     store_name = business_profile.store_name
     store_slug_response = business_profile.store_slug
@@ -490,5 +516,6 @@ async def get_vendor_products_and_categories(
         store_name=store_name,
         store_slug=store_slug_response,
         products=products_info,
-        total_products=len(products_info)
+        total_products=len(products_info),
+        category_management=category_management_info
     )
