@@ -439,6 +439,69 @@ async def get_products_by_store_slug(
         )
 
 
+@router.get("/by-vendor-id/{vendor_id}", response_model=List[ProductResponse])
+async def get_products_by_vendor_id(
+    vendor_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        # Get products directly using the vendor_id
+        result = await db.execute(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.subcategory),
+            )
+            .filter(Product.vendor_id == vendor_id)
+        )
+        products = result.scalars().all()
+
+        if not products:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No products found for vendor ID: {vendor_id}"
+            )
+
+        # Map products into the correct response model
+        response = []
+        for product in products:
+            image_urls = []
+            if product.images and "urls" in product.images:
+                image_urls = [get_media_url(url) for url in product.images["urls"]]
+
+            response.append(
+                ProductResponse(
+                    product_id=product.product_id,
+                    vendor_id=product.vendor_id,
+                    slug=product.slug,
+                    identification=product.identification,
+                    descriptions=product.descriptions,
+                    pricing=product.pricing,
+                    inventory=product.inventory,
+                    physical_attributes=product.physical_attributes,
+                    tags_and_relationships=product.tags_and_relationships,
+                    status_flags=product.status_flags,
+                    images={"urls": image_urls} if image_urls else None,
+                    timestamp=product.timestamp,
+                    category_id=product.category_id,
+                    category_name=product.category.category_name if product.category else None,
+                    subcategory_id=product.subcategory_id,
+                    subcategory_name=product.subcategory.subcategory_name if product.subcategory else None,
+                )
+            )
+
+        return response
+
+    except HTTPException:
+        # Re-raise HTTPException (like our 404) without modification
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve products: {str(e)}"
+        )
+
+
 
 @router.put("/{product_id}", response_model=ProductResponse, status_code=200)
 async def update_product(
