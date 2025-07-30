@@ -3,9 +3,10 @@ from typing import Any, Dict, Optional
 import uuid
 
 from sqlalchemy.ext.mutable import MutableDict
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func, event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
+from slugify import slugify
 from db.models.base import Base
 
 
@@ -331,6 +332,7 @@ class BusinessProfile(Base):
     business_logo: Mapped[str] = mapped_column(String, nullable=True)
     payment_preference: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
     store_name: Mapped[str] = mapped_column(String, nullable=True)
+    store_slug: Mapped[str] = mapped_column(String, nullable=True, unique=True)
     store_url: Mapped[str] = mapped_column(String, nullable=True)
     industry: Mapped[str] = mapped_column(
         String,
@@ -357,7 +359,66 @@ class BusinessProfile(Base):
         back_populates="business_profile",
         uselist=False
     )
- 
+
+
+# Event listener to automatically generate store_slug from store_name
+@event.listens_for(BusinessProfile.store_name, 'set')
+def generate_store_slug(target, value, oldvalue, initiator):
+    """
+    Automatically generate store_slug when store_name is set or updated.
+    """
+    if value and value != oldvalue:
+        # Generate base slug from store name
+        base_slug = slugify(value)
+        
+        # If the slug is empty (e.g., non-ASCII characters only), use a fallback
+        if not base_slug:
+            base_slug = f"store-{target.profile_ref_id}" if target.profile_ref_id else "store"
+        
+        # For new records or when slug changes, we'll set it directly
+        # The unique constraint will handle duplicates at the database level
+        target.store_slug = base_slug
+
+
+# Alternative method to generate unique slug with database session
+def generate_unique_store_slug(session, store_name: str, profile_ref_id: str = None, exclude_id: str = None) -> str:
+    """
+    Generate a unique store slug by checking against existing slugs in the database.
+    
+    Args:
+        session: SQLAlchemy session
+        store_name: The store name to slugify
+        profile_ref_id: The profile reference ID for fallback
+        exclude_id: Profile ID to exclude from uniqueness check (for updates)
+    
+    Returns:
+        A unique slug string
+    """
+    base_slug = slugify(store_name) if store_name else f"store-{profile_ref_id}" if profile_ref_id else "store"
+    
+    if not base_slug:
+        base_slug = f"store-{profile_ref_id}" if profile_ref_id else "store"
+    
+    # Check if slug exists
+    query = session.query(BusinessProfile).filter(BusinessProfile.store_slug == base_slug)
+    if exclude_id:
+        query = query.filter(BusinessProfile.profile_ref_id != exclude_id)
+    
+    if not query.first():
+        return base_slug
+    
+    # If slug exists, append a number
+    counter = 1
+    while True:
+        new_slug = f"{base_slug}-{counter}"
+        query = session.query(BusinessProfile).filter(BusinessProfile.store_slug == new_slug)
+        if exclude_id:
+            query = query.filter(BusinessProfile.profile_ref_id != exclude_id)
+        
+        if not query.first():
+            return new_slug
+        counter += 1
+
  
 
 class Industries(Base):

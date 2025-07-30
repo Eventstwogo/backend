@@ -12,6 +12,7 @@ class VendorCategoryInfo(BaseModel):
 class VendorDetailsResponse(BaseModel):
     vendor_id: str
     store_name: Optional[str] = None
+    store_slug: Optional[str] = None
     location: Optional[str] = None
     business_logo: Optional[str] = None
     store_logo: Optional[str] = None
@@ -45,5 +46,6 @@ class VendorProductInfo(BaseModel):
 class VendorProductsAndCategoriesResponse(BaseModel):
     vendor_id: str
     store_name: Optional[str] = None
+    store_slug: Optional[str] = None
     products: List[VendorProductInfo] = []
     total_products: int = 0
