@@ -9,6 +9,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from utils.id_generators import decrypt_data, decrypt_dict_values
+from utils.file_uploads import get_media_url
 from db.models.superadmin import BusinessProfile, VendorLogin, VendorCategoryManagement, Category, SubCategory, Product, Industries
 from db.sessions.database import get_db
 from schemas.vendor_details import AllVendorsResponse, VendorDetailsResponse, VendorProductsAndCategoriesResponse
@@ -540,6 +541,12 @@ async def get_vendor_products_and_categories(
     # Process products with all details
     products_info = []
     for product, category in products_data:
+        # Process image URLs
+        processed_images = product.images
+        if product.images and "urls" in product.images:
+            image_urls = [get_media_url(url) for url in product.images["urls"]]
+            processed_images = {"urls": image_urls}
+        
         products_info.append({
             "product_id": product.product_id,
             "vendor_id": product.vendor_id,
@@ -552,7 +559,7 @@ async def get_vendor_products_and_categories(
             "pricing": product.pricing,
             "inventory": product.inventory,
             "physical_attributes": product.physical_attributes,
-            "images": product.images,
+            "images": processed_images,
             "tags_and_relationships": product.tags_and_relationships,
             "status_flags": product.status_flags or {},
         })
