@@ -79,7 +79,7 @@ class ProductCreate(BaseModel):
 
 class ProductResponse(BaseModel):
     product_id: str
-    vendor_id: str
+    store_name: Optional[str]
     slug: str
     identification: Dict[str, Any]
     descriptions: Optional[Dict[str, Any]]
@@ -110,4 +110,74 @@ class ProductSearchResult(BaseModel):
     selling_price: str
     slug: str
     category_slug: str
+
+
+class ProductByCategoryResponse(BaseModel):
+    """Simplified product response for category-based listings"""
+    product_id: str
+    product_name: str
+    product_sku: Optional[str]
+    slug: str
+    short_description: Optional[str]
+    selling_price: Optional[str]
+    actual_price: Optional[str]
+    thumbnail_image: Optional[str]
+    featured_product: bool
+    published_product: bool
+    product_status: bool
+    timestamp: Optional[datetime]
+    category_name: str
+    subcategory_name: Optional[str]
+    store_name: Optional[str]
+
+
+class ProductByCategoryListResponse(BaseModel):
+    """Response model for products by category or subcategory"""
+    products: List[ProductByCategoryResponse]
+    total_count: int
+    slug: str
+    slug_type: str  # "category" or "subcategory"
+    category_name: str
+    subcategory_name: Optional[str] = None
+
+
+class ProductSearchResponse(BaseModel):
+    """Response model for product search results"""
+    product_id: str
+    product_name: str
+    product_image: Optional[str]
+    product_pricing: Optional[str]
+    slug: str
+    category: str
+
+
+class ProductSearchListResponse(BaseModel):
+    """Response model for product search list"""
+    products: List[ProductSearchResponse]
+    total_count: int
+
+
+class AllProductsResponse(BaseModel):
+    """Response model for all products with vendor and category details"""
+    vendor_id: str
+    store_name: Optional[str]
+    product_id: str
+    product_name: str
+    product_image: Optional[str]
+    product_slug: str
+    category_id: str
+    category_name: str
+    subcategory_id: Optional[str]
+    subcategory_name: Optional[str]
+    industry_id: Optional[str]
+    industry_name: Optional[str]
+
+
+class AllProductsListResponse(BaseModel):
+    """Response model for all products list"""
+    products: List[AllProductsResponse]
+    total_count: int
+    page: int
+    per_page: int
+    total_pages: int
 

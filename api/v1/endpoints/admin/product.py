@@ -8,8 +8,8 @@ from utils.file_uploads import get_media_url, save_uploaded_file
 # from core.upload_files_to_space import upload_file_to_s3
 from sqlalchemy.orm import selectinload
 from utils.id_generators import generate_lowercase
-from schemas.products import ProductResponse, ProductListResponse
-from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
+from schemas.products import ProductByCategoryListResponse, ProductByCategoryResponse, ProductResponse, ProductListResponse, ProductSearchListResponse, ProductSearchResponse
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.status_codes import APIResponse, StatusCode
 from db.models.superadmin import Category, SubCategory, Product, VendorLogin, BusinessProfile
@@ -19,6 +19,32 @@ from sqlalchemy import func
 
 UPLOAD_CATEGORY_FOLDER = "uploads/products"
 
+
+def safe_json_parse(json_str: Optional[str]) -> Optional[dict]:
+    """Safely parse JSON string, returning None if string is None or empty"""
+    if json_str is None or not json_str.strip():
+        return None
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        raise
+
+
+async def generate_unique_slug(product_name: str, db: AsyncSession, current_product_id: str = None) -> str:
+    """Generate a unique slug from product name, excluding current product if updating"""
+    base_slug = slugify(product_name)
+    slug = base_slug
+    suffix = 0
+    while True:
+        query = select(Product).filter(Product.slug == slug)
+        if current_product_id:
+            query = query.filter(Product.product_id != current_product_id)
+        result = await db.execute(query)
+        if not result.scalars().first():
+            break
+        suffix += 1
+        slug = f"{base_slug}-{suffix}"
+    return slug
 
 
 router = APIRouter()
@@ -41,7 +67,11 @@ async def create_product(
 ):
     try:
         # Validate vendor
-        result = await db.execute(select(VendorLogin).filter(VendorLogin.user_id == vendor_id))
+        result = await db.execute(
+            select(VendorLogin)
+            .options(selectinload(VendorLogin.business_profile))
+            .filter(VendorLogin.user_id == vendor_id)
+        )
         vendor_check = result.scalars().first()
         if not vendor_check:
             return APIResponse.response(StatusCode.NOT_FOUND, "Vendor not found", log_error=True)
@@ -160,10 +190,15 @@ async def create_product(
         # Prepare response
         category_name = category.category_name
         subcategory_name = subcategory.subcategory_name if subcategory else None
+        
+        # Get store_name from business profile
+        store_name = None
+        if vendor_check and vendor_check.business_profile:
+            store_name = vendor_check.business_profile.store_name
 
         response_data = ProductResponse(
             product_id=db_product.product_id,
-            vendor_id=db_product.vendor_id,
+            store_name=store_name,
             slug=db_product.slug,
             identification=db_product.identification,
             descriptions=db_product.descriptions,
@@ -196,19 +231,24 @@ async def get_all_products(db: AsyncSession = Depends(get_db)):
         count_result = await db.execute(select(func.count(Product.product_id)))
         total_count = count_result.scalar()
 
-        # Get all products with category and subcategory information
-        result = await db.execute(select(Product).options(
-            selectinload(Product.category),
-            selectinload(Product.subcategory)
-        ))
-        products = result.scalars().all()
+        # Get all products with category, subcategory, and vendor business profile information
+        result = await db.execute(
+            select(Product, VendorLogin, BusinessProfile)
+            .join(VendorLogin, Product.vendor_id == VendorLogin.user_id)
+            .join(BusinessProfile, VendorLogin.business_profile_id == BusinessProfile.profile_ref_id)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.subcategory)
+            )
+        )
+        products_data = result.all()
 
-        if not products:
+        if not products_data:
             return ProductListResponse(products=[], total_count=0)
 
         # Convert ORM objects to response-ready dicts
         product_responses = []
-        for product in products:
+        for product, vendor_login, business_profile in products_data:
             product_data = product.__dict__.copy()
             
             # Remove internal SQLAlchemy state
@@ -222,6 +262,12 @@ async def get_all_products(db: AsyncSession = Depends(get_db)):
             product_data["subcategory_name"] = (
                 product.subcategory.subcategory_name if product.subcategory else None
             )
+            
+            # Add store_name from business profile
+            product_data["store_name"] = business_profile.store_name if business_profile else None
+            
+            # Remove vendor_id from response
+            product_data.pop("vendor_id", None)
 
             # Process image URLs
             if product.images and "urls" in product.images:
@@ -239,18 +285,160 @@ async def get_all_products(db: AsyncSession = Depends(get_db)):
             log_error=True,
         )
 
+@router.get("/search", response_model=ProductSearchListResponse, status_code=200)
+async def search_products(db: AsyncSession = Depends(get_db)):
+
+    try:
+        # Build the query to get 10 products
+        query = (
+            select(Product, Category.category_name.label("category_name"))
+            .join(Category, Product.category_id == Category.category_id)
+            .limit(10)
+        )
+        
+        # Get total count of all products
+        count_query = select(func.count(Product.product_id))
+        count_result = await db.execute(count_query)
+        total_count = count_result.scalar()
+        
+        # Execute the main query
+        result = await db.execute(query)
+        products_data = result.all()
+        
+        # Format the response
+        products = []
+        for product, category_name in products_data:
+            # Extract product image (first available image)
+            product_image = None
+            if product.images and "urls" in product.images and product.images["urls"]:
+                product_image = get_media_url(product.images["urls"][0])
+            
+            # Extract pricing
+            product_pricing = None
+            if product.pricing and product.pricing.get("selling_price"):
+                product_pricing = product.pricing["selling_price"]
+            
+            # Extract product name
+            product_name = product.identification.get("product_name", "")
+            
+            products.append(ProductSearchResponse(
+                product_id=product.product_id,
+                product_name=product_name,
+                product_image=product_image,
+                product_pricing=product_pricing,
+                slug=product.slug,
+                category=category_name
+            ))
+        
+        return ProductSearchListResponse(
+            products=products,
+            total_count=total_count
+        )
+        
+    except Exception as e:
+        return APIResponse.response(
+            StatusCode.SERVER_ERROR,
+            f"Failed to search products: {str(e)}",
+            log_error=True,
+        )
+
+@router.get("/search-by-name", response_model=ProductSearchListResponse, status_code=200)
+async def search_products_by_name(
+    product_name: Optional[str] = Query(None, description="Product name to search for (prefix matching - matches from beginning only). If not provided, returns latest 10 products."),
+    db: AsyncSession = Depends(get_db)
+):
+
+    try:
+        if product_name:
+            # Build the query to search products by name with prefix matching
+            query = (
+                select(Product, Category.category_name.label("category_name"))
+                .join(Category, Product.category_id == Category.category_id)
+                .where(Product.identification["product_name"].astext.ilike(f"{product_name}%"))
+                .order_by(Product.timestamp.desc())
+                .limit(10)
+            )
+            
+            # Get total count of matching products
+            count_query = (
+                select(func.count(Product.product_id))
+                .join(Category, Product.category_id == Category.category_id)
+                .where(Product.identification["product_name"].astext.ilike(f"{product_name}%"))
+            )
+        else:
+            # Build the query to get latest 10 products when no search term provided
+            query = (
+                select(Product, Category.category_name.label("category_name"))
+                .join(Category, Product.category_id == Category.category_id)
+                .order_by(Product.timestamp.desc())
+                .limit(10)
+            )
+            
+            # Get total count of all products
+            count_query = select(func.count(Product.product_id))
+        count_result = await db.execute(count_query)
+        total_count = count_result.scalar()
+        
+        # Execute the main query
+        result = await db.execute(query)
+        products_data = result.all()
+        
+        # Format the response
+        products = []
+        for product, category_name in products_data:
+            # Extract product image (first available image)
+            product_image = None
+            if product.images and "urls" in product.images and product.images["urls"]:
+                product_image = get_media_url(product.images["urls"][0])
+            
+            # Extract pricing
+            product_pricing = None
+            if product.pricing and product.pricing.get("selling_price"):
+                product_pricing = product.pricing["selling_price"]
+            
+            # Extract product name
+            product_name_value = product.identification.get("product_name", "")
+            
+            products.append(ProductSearchResponse(
+                product_id=product.product_id,
+                product_name=product_name_value,
+                product_image=product_image,
+                product_pricing=product_pricing,
+                slug=product.slug,
+                category=category_name
+            ))
+        
+        return ProductSearchListResponse(
+            products=products,
+            total_count=total_count
+        )
+        
+    except Exception as e:
+        return APIResponse.response(
+            StatusCode.SERVER_ERROR,
+            f"Failed to search products by name: {str(e)}",
+            log_error=True,
+        )
+
 @router.get("/{product_id}", response_model=ProductResponse, status_code=200)
 async def get_product_by_id(product_id: str, db: AsyncSession = Depends(get_db)):
     try:
-        result = await db.execute(select(Product).filter(Product.product_id == product_id))
-        product = result.scalars().first()
+        result = await db.execute(
+            select(Product, VendorLogin, BusinessProfile)
+            .join(VendorLogin, Product.vendor_id == VendorLogin.user_id)
+            .join(BusinessProfile, VendorLogin.business_profile_id == BusinessProfile.profile_ref_id)
+            .filter(Product.product_id == product_id)
+        )
+        product_data = result.first()
 
-        if not product:
+        if not product_data:
             return APIResponse.response(
                 StatusCode.NOT_FOUND,
                 f"Product with ID {product_id} not found",
                 log_error=False,
             )
+        
+        product, vendor_login, business_profile = product_data
 
         # Fetch category/subcategory names
         category_result = await db.execute(select(Category.category_name).where(Category.category_id == product.category_id))
@@ -268,7 +456,7 @@ async def get_product_by_id(product_id: str, db: AsyncSession = Depends(get_db))
         # Build and return ProductResponse
         product_response = ProductResponse(
             product_id=product.product_id,
-            vendor_id=product.vendor_id,
+            store_name=business_profile.store_name if business_profile else None,
             slug=product.slug,
             identification=product.identification,
             descriptions=product.descriptions,
@@ -300,21 +488,25 @@ async def get_product_by_id(product_id: str, db: AsyncSession = Depends(get_db))
 async def get_product_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(
-            select(Product)
+            select(Product, VendorLogin, BusinessProfile)
+            .join(VendorLogin, Product.vendor_id == VendorLogin.user_id)
+            .join(BusinessProfile, VendorLogin.business_profile_id == BusinessProfile.profile_ref_id)
             .where(Product.slug == slug)
             .options(
                 selectinload(Product.category),
                 selectinload(Product.subcategory)
             )
         )
-        product = result.scalars().first()
+        product_data = result.first()
 
-        if not product:
+        if not product_data:
             return APIResponse.response(
                 StatusCode.NOT_FOUND,
                 f"Product with slug '{slug}' not found",
                 log_error=False,
             )
+        
+        product, vendor_login, business_profile = product_data
 
         # Process image URLs
         processed_images = product.images
@@ -324,7 +516,7 @@ async def get_product_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
 
         return ProductResponse(
             product_id=product.product_id,
-            vendor_id=product.vendor_id,
+            store_name=business_profile.store_name if business_profile else None,
             slug=product.slug,
             identification=product.identification,
             descriptions=product.descriptions,
@@ -408,7 +600,7 @@ async def get_products_by_store_slug(
             response.append(
                 ProductResponse(
                     product_id=product.product_id,
-                    vendor_id=product.vendor_id,
+                    store_name=business_profile.store_name,
                     slug=product.slug,
                     identification=product.identification,
                     descriptions=product.descriptions,
@@ -445,18 +637,20 @@ async def get_products_by_vendor_id(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        # Get products directly using the vendor_id
+        # Get products with business profile data using the vendor_id
         result = await db.execute(
-            select(Product)
+            select(Product, VendorLogin, BusinessProfile)
+            .join(VendorLogin, Product.vendor_id == VendorLogin.user_id)
+            .join(BusinessProfile, VendorLogin.business_profile_id == BusinessProfile.profile_ref_id)
             .options(
                 selectinload(Product.category),
                 selectinload(Product.subcategory),
             )
             .filter(Product.vendor_id == vendor_id)
         )
-        products = result.scalars().all()
+        products_data = result.all()
 
-        if not products:
+        if not products_data:
             raise HTTPException(
                 status_code=404,
                 detail=f"No products found for vendor ID: {vendor_id}"
@@ -464,7 +658,7 @@ async def get_products_by_vendor_id(
 
         # Map products into the correct response model
         response = []
-        for product in products:
+        for product, vendor_login, business_profile in products_data:
             image_urls = []
             if product.images and "urls" in product.images:
                 image_urls = [get_media_url(url) for url in product.images["urls"]]
@@ -472,7 +666,7 @@ async def get_products_by_vendor_id(
             response.append(
                 ProductResponse(
                     product_id=product.product_id,
-                    vendor_id=product.vendor_id,
+                    store_name=business_profile.store_name if business_profile else None,
                     slug=product.slug,
                     identification=product.identification,
                     descriptions=product.descriptions,
@@ -503,7 +697,7 @@ async def get_products_by_vendor_id(
 
 
 
-@router.put("/{product_id}", response_model=ProductResponse, status_code=200)
+@router.put("/id/{product_id}", response_model=ProductResponse, status_code=200)
 async def update_product(
     product_id: str,
     cat_id: Optional[str] = Form(default=None),
@@ -541,34 +735,42 @@ async def update_product(
         product.subcategory_id = subcat_id
 
     try:
-        if identification is not None:
-            product.identification = {**product.identification, **json.loads(identification)}
+        identification_data = safe_json_parse(identification)
+        if identification_data:
+            product.identification = {**product.identification, **identification_data}
 
-        if descriptions is not None:
-            desc_data = json.loads(descriptions)
-            product.descriptions = {**(product.descriptions or {}), **desc_data}
+        descriptions_data = safe_json_parse(descriptions)
+        if descriptions_data:
+            product.descriptions = {**(product.descriptions or {}), **descriptions_data}
 
-        if pricing is not None:
-            price_data = json.loads(pricing)
-            product.pricing = {**(product.pricing or {}), **price_data}
+        pricing_data = safe_json_parse(pricing)
+        if pricing_data:
+            product.pricing = {**(product.pricing or {}), **pricing_data}
 
-        if inventory is not None:
-            inv_data = json.loads(inventory)
-            product.inventory = {**(product.inventory or {}), **inv_data}
+        inventory_data = safe_json_parse(inventory)
+        if inventory_data:
+            product.inventory = {**(product.inventory or {}), **inventory_data}
 
-        if physical_attributes is not None:
-            phys_data = json.loads(physical_attributes)
-            product.physical_attributes = {**(product.physical_attributes or {}), **phys_data}
+        physical_attributes_data = safe_json_parse(physical_attributes)
+        if physical_attributes_data:
+            product.physical_attributes = {**(product.physical_attributes or {}), **physical_attributes_data}
 
-        if tags_and_relationships is not None:
-            tag_data = json.loads(tags_and_relationships)
-            product.tags_and_relationships = {**(product.tags_and_relationships or {}), **tag_data}
+        tags_and_relationships_data = safe_json_parse(tags_and_relationships)
+        if tags_and_relationships_data:
+            product.tags_and_relationships = {**(product.tags_and_relationships or {}), **tags_and_relationships_data}
 
-        if status_flags is not None:
-            status_data = json.loads(status_flags)
-            product.status_flags = {**product.status_flags, **status_data}
+        status_flags_data = safe_json_parse(status_flags)
+        if status_flags_data:
+            product.status_flags = {**product.status_flags, **status_flags_data}
     except json.JSONDecodeError as e:
         return APIResponse.response(StatusCode.BAD_REQUEST, f"Invalid JSON data: {str(e)}", log_error=True)
+
+    # Update slug if product name was changed
+    if identification_data and "product_name" in identification_data:
+        new_product_name = identification_data["product_name"].strip()
+        if new_product_name:
+            new_slug = await generate_unique_slug(new_product_name, db, product_id)
+            product.slug = new_slug
 
     if files:
         try:
@@ -605,10 +807,21 @@ async def update_product(
             select(SubCategory.subcategory_name).filter(SubCategory.subcategory_id == product.subcategory_id)
         )
         subcategory_name = result.scalar()
+    
+    # Fetch store_name from business profile
+    store_name = None
+    vendor_result = await db.execute(
+        select(VendorLogin)
+        .options(selectinload(VendorLogin.business_profile))
+        .filter(VendorLogin.user_id == product.vendor_id)
+    )
+    vendor = vendor_result.scalars().first()
+    if vendor and vendor.business_profile:
+        store_name = vendor.business_profile.store_name
 
     return ProductResponse(
         product_id=product.product_id,
-        vendor_id=product.vendor_id,
+        store_name=store_name,
         slug=product.slug,
         identification=product.identification,
         descriptions=product.descriptions,
@@ -626,7 +839,7 @@ async def update_product(
     )
 
 
-@router.put("/{slug}", response_model=ProductResponse, status_code=200)
+@router.put("/slug/{slug}", response_model=ProductResponse, status_code=200)
 async def update_product_by_slug(
     slug: str,
     cat_id: Optional[str] = Form(default=None),
@@ -664,34 +877,42 @@ async def update_product_by_slug(
         product.subcategory_id = subcat_id
 
     try:
-        if identification is not None:
-            product.identification = {**product.identification, **json.loads(identification)}
+        identification_data = safe_json_parse(identification)
+        if identification_data:
+            product.identification = {**product.identification, **identification_data}
 
-        if descriptions is not None:
-            desc_data = json.loads(descriptions)
-            product.descriptions = {**(product.descriptions or {}), **desc_data}
+        descriptions_data = safe_json_parse(descriptions)
+        if descriptions_data:
+            product.descriptions = {**(product.descriptions or {}), **descriptions_data}
 
-        if pricing is not None:
-            price_data = json.loads(pricing)
-            product.pricing = {**(product.pricing or {}), **price_data}
+        pricing_data = safe_json_parse(pricing)
+        if pricing_data:
+            product.pricing = {**(product.pricing or {}), **pricing_data}
 
-        if inventory is not None:
-            inv_data = json.loads(inventory)
-            product.inventory = {**(product.inventory or {}), **inv_data}
+        inventory_data = safe_json_parse(inventory)
+        if inventory_data:
+            product.inventory = {**(product.inventory or {}), **inventory_data}
 
-        if physical_attributes is not None:
-            phys_data = json.loads(physical_attributes)
-            product.physical_attributes = {**(product.physical_attributes or {}), **phys_data}
+        physical_attributes_data = safe_json_parse(physical_attributes)
+        if physical_attributes_data:
+            product.physical_attributes = {**(product.physical_attributes or {}), **physical_attributes_data}
 
-        if tags_and_relationships is not None:
-            tag_data = json.loads(tags_and_relationships)
-            product.tags_and_relationships = {**(product.tags_and_relationships or {}), **tag_data}
+        tags_and_relationships_data = safe_json_parse(tags_and_relationships)
+        if tags_and_relationships_data:
+            product.tags_and_relationships = {**(product.tags_and_relationships or {}), **tags_and_relationships_data}
 
-        if status_flags is not None:
-            status_data = json.loads(status_flags)
-            product.status_flags = {**product.status_flags, **status_data}
+        status_flags_data = safe_json_parse(status_flags)
+        if status_flags_data:
+            product.status_flags = {**product.status_flags, **status_flags_data}
     except json.JSONDecodeError as e:
         return APIResponse.response(StatusCode.BAD_REQUEST, f"Invalid JSON data: {str(e)}", log_error=True)
+
+    # Update slug if product name was changed
+    if identification_data and "product_name" in identification_data:
+        new_product_name = identification_data["product_name"].strip()
+        if new_product_name:
+            new_slug = await generate_unique_slug(new_product_name, db, product.product_id)
+            product.slug = new_slug
 
     if files:
         try:
@@ -728,10 +949,21 @@ async def update_product_by_slug(
             select(SubCategory.subcategory_name).filter(SubCategory.subcategory_id == product.subcategory_id)
         )
         subcategory_name = result.scalar()
+    
+    # Fetch store_name from business profile
+    store_name = None
+    vendor_result = await db.execute(
+        select(VendorLogin)
+        .options(selectinload(VendorLogin.business_profile))
+        .filter(VendorLogin.user_id == product.vendor_id)
+    )
+    vendor = vendor_result.scalars().first()
+    if vendor and vendor.business_profile:
+        store_name = vendor.business_profile.store_name
 
     return ProductResponse(
         product_id=product.product_id,
-        vendor_id=product.vendor_id,
+        store_name=store_name,
         slug=product.slug,
         identification=product.identification,
         descriptions=product.descriptions,
@@ -820,3 +1052,133 @@ async def restore_product(slug: str, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"message": f"Product {slug} restored successfully"}
+
+
+@router.get("/category/{slug}", response_model=ProductByCategoryListResponse, status_code=200)
+async def get_products_by_category_or_subcategory_slug(
+    slug: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        # First, try to find a category by slug
+        category_result = await db.execute(
+            select(Category).filter(Category.category_slug == slug)
+        )
+        category = category_result.scalars().first()
+        
+        subcategory = None
+        slug_type = None
+        category_name = None
+        subcategory_name = None
+        
+        if category:
+            # Found a category
+            slug_type = "category"
+            category_name = category.category_name
+            
+            # Get all products for this category with business profile
+            products_query = (
+                select(Product, VendorLogin, BusinessProfile)
+                .join(VendorLogin, Product.vendor_id == VendorLogin.user_id)
+                .join(BusinessProfile, VendorLogin.business_profile_id == BusinessProfile.profile_ref_id)
+                .filter(Product.category_id == category.category_id)
+            )
+            count_query = select(func.count(Product.product_id)).filter(Product.category_id == category.category_id)
+            
+        else:
+            # Try to find a subcategory by slug
+            subcategory_result = await db.execute(
+                select(SubCategory)
+                .filter(SubCategory.subcategory_slug == slug)
+                .options(selectinload(SubCategory.category))
+            )
+            subcategory = subcategory_result.scalars().first()
+            
+            if not subcategory:
+                return APIResponse.response(
+                    StatusCode.NOT_FOUND,
+                    f"Category or subcategory with slug '{slug}' not found",
+                    log_error=False,
+                )
+            
+            # Found a subcategory
+            slug_type = "subcategory"
+            category_name = subcategory.category.category_name
+            subcategory_name = subcategory.subcategory_name
+            
+            # Get all products for this subcategory with business profile
+            products_query = (
+                select(Product, VendorLogin, BusinessProfile)
+                .join(VendorLogin, Product.vendor_id == VendorLogin.user_id)
+                .join(BusinessProfile, VendorLogin.business_profile_id == BusinessProfile.profile_ref_id)
+                .filter(Product.subcategory_id == subcategory.subcategory_id)
+            )
+            count_query = select(func.count(Product.product_id)).filter(Product.subcategory_id == subcategory.subcategory_id)
+
+        # Add options to load relationships
+        products_query = products_query.options(
+            selectinload(Product.category),
+            selectinload(Product.subcategory)
+        )
+
+        # Execute queries
+        products_result = await db.execute(products_query)
+        products_data = products_result.all()
+
+        count_result = await db.execute(count_query)
+        total_count = count_result.scalar()
+
+        # Convert ORM objects to simplified response format
+        product_responses = []
+        for product, vendor_login, business_profile in products_data:
+            # Get thumbnail image (first image if available)
+            thumbnail_image = None
+            if product.images and "urls" in product.images and product.images["urls"]:
+                thumbnail_image = get_media_url(product.images["urls"][0])
+
+            # Extract data from JSON fields
+            product_name = product.identification.get("product_name", "") if product.identification else ""
+            product_sku = product.identification.get("product_sku", "") if product.identification else None
+            short_description = product.descriptions.get("short_description", "") if product.descriptions else None
+            selling_price = product.pricing.get("selling_price", "") if product.pricing else None
+            actual_price = product.pricing.get("actual_price", "") if product.pricing else None
+            
+            # Extract status flags
+            featured_product = product.status_flags.get("featured_product", False) if product.status_flags else False
+            published_product = product.status_flags.get("published_product", True) if product.status_flags else True
+            product_status = product.status_flags.get("product_status", False) if product.status_flags else False
+
+            product_response = ProductByCategoryResponse(
+                product_id=product.product_id,
+                product_name=product_name,
+                product_sku=product_sku,
+                slug=product.slug,
+                short_description=short_description,
+                selling_price=selling_price,
+                actual_price=actual_price,
+                thumbnail_image=thumbnail_image,
+                featured_product=featured_product,
+                published_product=published_product,
+                product_status=product_status,
+                timestamp=product.timestamp,
+                category_name=category_name,
+                subcategory_name=product.subcategory.subcategory_name if product.subcategory else None,
+                store_name=business_profile.store_name if business_profile else None,
+            )
+            product_responses.append(product_response)
+
+        return ProductByCategoryListResponse(
+            products=product_responses,
+            total_count=total_count,
+            slug=slug,
+            slug_type=slug_type,
+            category_name=category_name,
+            subcategory_name=subcategory_name
+        )
+
+    except Exception as e:
+        return APIResponse.response(
+            StatusCode.SERVER_ERROR,
+            f"Failed to retrieve products by category slug: {str(e)}",
+            log_error=True,
+        )
