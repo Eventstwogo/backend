@@ -1,12 +1,16 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 from passlib.context import CryptContext
+from services.email_service import EmailTemplateService
 from utils.validations import generate_random_password
 from core.api_response import api_response
 from db.models.superadmin import AdminUser, Config, Role
 from db.sessions.database import get_db
 from schemas.admin_user import (
+    AdminCreateRequest,
+    AdminCreateResponse,
     AdminRegisterRequest,
     AdminRegisterResponse,
 )
@@ -26,6 +30,115 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 router = APIRouter()
+
+
+@router.post("/admin/create", response_model=AdminCreateResponse, status_code=status.HTTP_201_CREATED)
+async def create_admin_user(
+    admin_data: AdminCreateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        # Check if user with this email already exists
+        email_hash = hash_data(admin_data.email)
+        existing_user_stmt = select(AdminUser).where(AdminUser.email_hash == email_hash)
+        existing_user_result = await db.execute(existing_user_stmt)
+        existing_user = existing_user_result.scalar_one_or_none()
+        
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User with this email already exists"
+            )
+        
+        # Check if username already exists (need to check encrypted usernames)
+        encrypted_username = encrypt_data(admin_data.username)
+        existing_username_stmt = select(AdminUser).where(AdminUser.username == encrypted_username)
+        existing_username_result = await db.execute(existing_username_stmt)
+        existing_username_user = existing_username_result.scalar_one_or_none()
+        
+        if existing_username_user:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User with this username already exists"
+            )
+        
+        # Get SUPERADMIN role from roles table
+        role_stmt = select(Role).where(Role.role_name == "SUPERADMIN")
+        role_result = await db.execute(role_stmt)
+        superadmin_role = role_result.scalar_one_or_none()
+        
+        if not superadmin_role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="SUPERADMIN role not found in database"
+            )
+        
+        # Check superadmin uniqueness - only allow one superadmin
+        superadmin_result = await validate_superadmin_uniqueness(db, superadmin_role)
+        if superadmin_result is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Super Admin already exists. Only one Super Admin is allowed."
+            )
+        
+        # Generate unique user ID
+        user_id = generate_lower_uppercase(length=6)
+        
+        # Encrypt sensitive data
+        encrypted_email = encrypt_data(admin_data.email)
+        
+        # Hash password
+        hashed_password = pwd_context.hash(admin_data.password)
+        
+        # Create new admin user
+        new_admin = AdminUser(
+            user_id=user_id,
+            role_id=superadmin_role.role_id,
+            username=encrypted_username,
+            email=encrypted_email,
+            email_hash=email_hash,
+            password=hashed_password,
+            login_status=0,  # Default login status is 0 (no email verification required)
+            is_active=False, 
+        )
+        
+        # Add to database
+        db.add(new_admin)
+        await db.commit()
+        await db.refresh(new_admin)
+        
+        # Send welcome email
+        email_service = EmailTemplateService()
+        email_sent = False
+        
+        try:
+            email_sent = email_service.send_admin_welcome_email(
+                email=admin_data.email,
+                username=admin_data.username,
+                password=admin_data.password,  # Send the plain password in email
+                role="SUPERADMIN"
+            )
+        except Exception as e:
+            # Log the error but don't fail the user creation
+            print(f"Failed to send welcome email: {e}")
+        
+        return AdminCreateResponse(
+            user_id=user_id,
+            username=admin_data.username,
+            email=admin_data.email,
+            role_id=superadmin_role.role_id,
+            message="Admin user created successfully" + (" and welcome email sent" if email_sent else " but email sending failed"),
+            email_sent=email_sent
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create admin user: {str(e)}"
+        )
 
 @router.post(
     "/register",

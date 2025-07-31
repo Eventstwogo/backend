@@ -247,3 +247,94 @@ class ChangeInitialPasswordRequest(BaseModel):
 
 class ChangeInitialPasswordResponse(BaseModel):
     message: str
+
+
+class AdminCreateRequest(BaseModel):
+    username: str = Field(
+        ...,
+        min_length=3,
+        max_length=255,
+        title="Username",
+        description="Unique username for the admin. Must be 4-32 characters, and start with 3 letters. Letters, numbers, spaces, and hyphens are allowed.",
+    )
+    email: EmailStr = Field(
+        ...,
+        title="Email Address",
+        description="Valid email address for the admin.",
+    )
+    password: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        title="Password",
+        description="Password for the admin user.",
+    )
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v):
+        v = normalize_whitespace(v)
+        if not v:
+            raise ValueError("Username cannot be empty.")
+        if not is_valid_username(v, allow_spaces=True, allow_hyphens=True):
+            raise ValueError(
+                "Username can only contain letters, numbers, spaces, and hyphens."
+            )
+        if not validate_length_range(v, 4, 32):
+            raise ValueError("Username must be 4-32 characters long.")
+        if contains_xss(v):
+            raise ValueError("Username contains potentially malicious content.")
+        if has_excessive_repetition(v, max_repeats=3):
+            raise ValueError("Username contains excessive repeated characters.")
+        if len(v) < 3 or not all(c.isalpha() for c in v[:3]):
+            raise ValueError(
+                "First three characters of username must be letters."
+            )
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v):
+        v = normalize_whitespace(v)
+        if not v:
+            raise ValueError("Email cannot be empty.")
+        # Use your advanced email validator
+        EmailValidator.validate(str(v))
+        return v.lower()
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if not v:
+            raise ValueError("Password cannot be empty.")
+        
+        # Check length
+        if not (8 <= len(v) <= 128):
+            raise ValueError("Password must be between 8 and 128 characters long.")
+        
+        # Check for lowercase letter
+        if not any(c.islower() for c in v):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        
+        # Check for uppercase letter
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        
+        # Check for digit
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit.")
+        
+        # Check for special character
+        if not any(c in '!@#$%^&*()-_=+[]{}|;:,.<>?/~`' for c in v):
+            raise ValueError("Password must contain at least one special character (!@#$%^&*()-_=+[]{}|;:,.<>?/~`).")
+        
+        return v
+
+
+class AdminCreateResponse(BaseModel):
+    user_id: str
+    username: str
+    email: EmailStr
+    role_id: str
+    message: str
+    email_sent: bool

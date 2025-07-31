@@ -82,8 +82,8 @@ def validate_category_data(
     if meta_title:
         meta_title = sanitize_input(meta_title).strip()
         meta_title = normalize_whitespace(meta_title)
-        # Allow more characters in meta title: letters, numbers, spaces, periods, commas, hyphens, etc.
-        if not re.fullmatch(r"[A-Za-z0-9\s.,()&'\"!?:;-]+", meta_title):
+        # Allow more characters in meta title: letters, numbers, spaces, periods, commas, hyphens, pipes, etc.
+        if not re.fullmatch(r"[A-Za-z0-9\s.,()&'\"!?:;|-]+", meta_title):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Meta title contains invalid characters.",
@@ -502,8 +502,8 @@ def validate_subcategory_fields(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Meta title too long. Max 70 characters.",
             )
-        # Allow more characters in meta title: letters, numbers, spaces, periods, commas, hyphens, etc.
-        if not re.fullmatch(r"[A-Za-z0-9\s.,()&'\"!?:;-]+", meta_title):
+        # Allow more characters in meta title: letters, numbers, spaces, periods, commas, hyphens, pipes, etc.
+        if not re.fullmatch(r"[A-Za-z0-9\s.,()&'\"!?:;|-]+", meta_title):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Meta title contains invalid characters.",
