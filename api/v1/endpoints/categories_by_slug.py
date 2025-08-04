@@ -411,12 +411,17 @@ async def update_category_by_slug(
         return api_response(status.HTTP_400_BAD_REQUEST, "No changes detected.")
 
     # Prepare new values with fallback
+    name_updated = name is not None and name.strip() != ""
     input_name = (
         category.category_name if (name is None or name.strip() == "") else name
     )
-    input_slug = (
-        category.category_slug if (slug is None or slug.strip() == "") else slug
-    )
+    # If name is updated but no slug provided, use the updated name for slug
+    if name_updated and (slug is None or slug.strip() == ""):
+        input_slug = input_name
+    else:
+        input_slug = (
+            category.category_slug if (slug is None or slug.strip() == "") else slug
+        )
     input_description = (
         category.category_description
         if (description is None or description.strip() == "")
@@ -501,7 +506,7 @@ async def update_category_by_slug(
             description=input_description,
             meta_title=input_meta_title,
             meta_description=input_meta_description,
-            category_id_to_exclude=category.category_id,  # ✅ skip self
+            category_id_to_exclude=category.category_id,  #  skip self
         )
         if conflict_error:
             return api_response(status.HTTP_400_BAD_REQUEST, conflict_error)
@@ -509,7 +514,8 @@ async def update_category_by_slug(
     # Apply changes
     if name is not None and name.strip():
         category.category_name = name.upper()
-    if slug is not None and slug.strip():
+    # Update slug if explicitly provided OR if name was updated
+    if (slug is not None and slug.strip()) or name_updated:
         category.category_slug = final_slug
     if description is not None and description.strip():
         category.category_description = input_description

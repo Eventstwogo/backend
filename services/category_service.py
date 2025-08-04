@@ -27,8 +27,16 @@ def validate_category_data(
     meta_description: Optional[str],
     is_subcategory: bool = False,
 ) -> tuple[str, str, Optional[str], Optional[str], Optional[str]]:
+    # Security validation for name
+    if contains_xss(name) or contains_sql_injection(name):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, 
+            detail="Name contains potentially malicious content."
+        )
+    
     name = sanitize_input(name)
     name = normalize_whitespace(name)
+    
     if is_subcategory:
         if not is_valid_subcategory_name(name):
             raise HTTPException(
@@ -60,6 +68,13 @@ def validate_category_data(
         )
 
     if description:
+        # Security validation for description
+        if contains_xss(description) or contains_sql_injection(description):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Description contains potentially malicious content.",
+            )
+        
         description = sanitize_input(description).strip()
         description = normalize_whitespace(description)
         # Allow more characters in description: letters, numbers, spaces, periods, commas, hyphens, parentheses, etc.
@@ -80,6 +95,13 @@ def validate_category_data(
             )
 
     if meta_title:
+        # Security validation for meta title
+        if contains_xss(meta_title) or contains_sql_injection(meta_title):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Meta title contains potentially malicious content.",
+            )
+        
         meta_title = sanitize_input(meta_title).strip()
         meta_title = normalize_whitespace(meta_title)
         # Allow more characters in meta title: letters, numbers, spaces, periods, commas, hyphens, pipes, etc.
@@ -100,6 +122,13 @@ def validate_category_data(
             )
 
     if meta_description:
+        # Security validation for meta description
+        if contains_xss(meta_description) or contains_sql_injection(meta_description):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Meta description contains potentially malicious content.",
+            )
+        
         meta_description = sanitize_input(meta_description).strip()
         meta_description = normalize_whitespace(meta_description)
         # Allow more characters in meta description: letters, numbers, spaces, periods, commas, hyphens, etc.
@@ -444,6 +473,13 @@ def validate_subcategory_fields(
     meta_description: Optional[str],
 ) -> tuple[str, str, str, str, str]:
     """Sanitize and validate subcategory inputs."""
+    # Security validation for name
+    if contains_xss(name) or contains_sql_injection(name):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, 
+            detail="Name contains potentially malicious content."
+        )
+    
     name = normalize_whitespace(sanitize_input(name))
     slug = normalize_whitespace(sanitize_input(slug))
     description = (
@@ -479,6 +515,13 @@ def validate_subcategory_fields(
         )
 
     if description:
+        # Security validation for description
+        if contains_xss(description) or contains_sql_injection(description):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Description contains potentially malicious content.",
+            )
+        
         if not validate_length(description, 0, 500):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
@@ -497,6 +540,13 @@ def validate_subcategory_fields(
             )
 
     if meta_title:
+        # Security validation for meta title
+        if contains_xss(meta_title) or contains_sql_injection(meta_title):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Meta title contains potentially malicious content.",
+            )
+        
         if not validate_length(meta_title, 0, 70):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
@@ -515,6 +565,13 @@ def validate_subcategory_fields(
             )
 
     if meta_description:
+        # Security validation for meta description
+        if contains_xss(meta_description) or contains_sql_injection(meta_description):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Meta description contains potentially malicious content.",
+            )
+        
         if not validate_length(meta_description, 0, 160):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,

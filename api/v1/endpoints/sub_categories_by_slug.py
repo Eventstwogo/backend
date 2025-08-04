@@ -107,8 +107,13 @@ async def update_subcategory_by_slug(
 
 
     #  Apply fallback for unchanged fields
+    name_updated = name is not None and name.strip() != ""
     input_name = name or subcategory.subcategory_name
-    input_slug = new_slug or subcategory.subcategory_slug
+    # If name is updated but no slug provided, use the updated name for slug
+    if name_updated and not new_slug:
+        input_slug = input_name
+    else:
+        input_slug = new_slug or subcategory.subcategory_slug
     input_description = description or subcategory.subcategory_description
     input_meta_title = meta_title or subcategory.subcategory_meta_title
     input_meta_description = (
@@ -160,7 +165,8 @@ async def update_subcategory_by_slug(
     #  Update fields
     if name:
         subcategory.subcategory_name = cleaned_name.upper()
-    if new_slug:
+    # Update slug if explicitly provided OR if name was updated
+    if new_slug or name_updated:
         subcategory.subcategory_slug = final_slug
     if description:
         subcategory.subcategory_description = cleaned_description

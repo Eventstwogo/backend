@@ -123,16 +123,21 @@ async def update_subcategory(
         return api_response(status.HTTP_400_BAD_REQUEST, "No changes detected.")
 
     # === Prepare input values with fallback ===
+    name_updated = name is not None and name.strip() != ""
     input_name = (
         subcategory.subcategory_name
         if (name is None or name.strip() == "")
         else name
     )
-    input_slug = (
-        subcategory.subcategory_slug
-        if (slug is None or slug.strip() == "")
-        else slug
-    )
+    # If name is updated but no slug provided, use the updated name for slug
+    if name_updated and (slug is None or slug.strip() == ""):
+        input_slug = input_name
+    else:
+        input_slug = (
+            subcategory.subcategory_slug
+            if (slug is None or slug.strip() == "")
+            else slug
+        )
     input_description = (
         subcategory.subcategory_description
         if (description is None or description.strip() == "")
@@ -193,7 +198,8 @@ async def update_subcategory(
     # === Apply changes ===
     if name is not None and name.strip():
         subcategory.subcategory_name = input_name.upper()
-    if slug is not None and slug.strip():
+    # Update slug if explicitly provided OR if name was updated
+    if (slug is not None and slug.strip()) or name_updated:
         subcategory.subcategory_slug = final_slug
     if description is not None and description.strip():
         subcategory.subcategory_description = input_description

@@ -73,10 +73,10 @@ async def subcategory_analytics(
         select(
             func.count().label("total_subcategories"),
             func.count(
-                case((SubCategory.subcategory_status.is_(True), 1))
+                case((SubCategory.subcategory_status.is_(False), 1))
             ).label("active_subcategories"),
             func.count(
-                case((SubCategory.subcategory_status.is_(False), 1))
+                case((SubCategory.subcategory_status.is_(True), 1))
             ).label("inactive_subcategories"),
             func.count(
                 case((SubCategory.featured_subcategory.is_(True), 1))

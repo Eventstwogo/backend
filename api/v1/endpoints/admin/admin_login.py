@@ -21,7 +21,8 @@ async def login_user(
     db: AsyncSession = Depends(get_db),
 ):
     
-    email_hash = hash_data(login_data.email)
+    # Convert email to lowercase for case-insensitive comparison
+    email_hash = hash_data(login_data.email.strip().lower())
     # Find user by username or email
     stmt = select(AdminUser).where(
         AdminUser.email_hash == email_hash

@@ -63,10 +63,6 @@ async def forgot_password(
     # Step 3: Check if vendor account is active (False = active, True = inactive)
     if vendor.is_active:  # True means account is inactive
         return vendor_account_inactive()
-    
-    # Step 4: Check if vendor is verified (0 = unverified, 1 = verified)
-    if vendor.is_verified == 0:
-        return vendor_account_not_verified()
 
     # Step 5: Generate a secure 32-character reset token with 1 hour expiration
     reset_token, expires_at = generate_password_reset_token(
@@ -103,9 +99,9 @@ async def forgot_password(
 
     # Log email sending result
     if email_sent:
-        print(f"✅ Password reset email sent successfully to {email}")
+        print(f" Password reset email sent successfully to {email}")
     else:
-        print(f"❌ Failed to send password reset email to {email}")
+        print(f" Failed to send password reset email to {email}")
 
     # Return success message (don't include token in response for security)
     # Match the user system format
@@ -272,14 +268,6 @@ async def change_password(
         return api_response(
             status_code=status.HTTP_403_FORBIDDEN,
             message="Account is inactive. Cannot change password.",
-            log_error=True,
-        )
-    
-    # Step 3: Check if vendor is verified
-    if vendor.is_verified == 0:
-        return api_response(
-            status_code=status.HTTP_403_FORBIDDEN,
-            message="Account is not verified. Please verify your email address first.",
             log_error=True,
         )
     
