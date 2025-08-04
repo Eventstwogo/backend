@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import Any, Dict, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 import uuid
 
 from sqlalchemy.ext.mutable import MutableDict
@@ -527,4 +527,49 @@ class Enquiry(Base):
     )
     updated_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), onupdate=func.now(), server_default=func.now()
+    )
+
+
+class QueryStatus(Enum):
+    QUERY_OPEN = "open"
+    QUERY_IN_PROGRESS = "in_progress"
+    QUERY_ANSWERED = "answered"
+    QUERY_CLOSED = "closed"
+
+
+class VendorQuery(Base):
+    __tablename__ = "vendor_queries"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+    sender_user_id: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # who raised the query
+    receiver_user_id: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )  # admin who handles
+    title: Mapped[str] = mapped_column(String(100), nullable=False)
+    category: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    # The full threaded messages between vendor <-> admin
+    thread: Mapped[List[Dict[str, Any]]] = mapped_column(
+        JSONB,  # using JSONB for PostgreSQL
+        default=list,
+        nullable=False,
+    )
+
+    query_status: Mapped[QueryStatus] = mapped_column(
+        SQLAlchemyEnum(QueryStatus),
+        default=QueryStatus.QUERY_OPEN,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.now(timezone.utc),
+        onupdate=datetime.now(timezone.utc),
     )
