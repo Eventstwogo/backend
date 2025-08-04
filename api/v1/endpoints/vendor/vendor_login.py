@@ -93,12 +93,14 @@ async def login_user(
     profile_stmt = select(
         BusinessProfile.is_approved,
         BusinessProfile.ref_number,
-        BusinessProfile.industry
+        BusinessProfile.industry, 
+        BusinessProfile.store_slug,
+        BusinessProfile.reviewer_comment,
     ).where(BusinessProfile.profile_ref_id == user.business_profile_id)
     profile_result = await db.execute(profile_stmt)
     profile_data = profile_result.one_or_none()
 
-    is_approved, ref_number, industry = profile_data if profile_data else (-2, "", "")
+    is_approved, ref_number, industry, store_slug, reviewer_comment = profile_data if profile_data else (-2, "", "", "")
 
 
     # Step 7: Determine onboarding_status
@@ -130,7 +132,9 @@ async def login_user(
         is_approved=is_approved,
         ref_number=ref_number,
         industry=industry,
-        onboarding_status=onboarding_status
+        vendor_store_slug= store_slug,
+        onboarding_status=onboarding_status,
+        reviewer_comment= reviewer_comment
     )
 
     token_data = {

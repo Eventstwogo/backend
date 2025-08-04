@@ -157,7 +157,9 @@ class AdminUserInfo(BaseModel):
     is_approved: int
     ref_number: str
     industry: str
-    onboarding_status: str  
+    onboarding_status: str 
+    vendor_store_slug: str 
+    reviewer_comment: str
 
 class AdminLoginResponse(BaseModel):
     access_token: str
