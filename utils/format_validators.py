@@ -115,7 +115,7 @@ class PasswordValidator:
                 "status_code": status.HTTP_400_BAD_REQUEST,
                 "message": (
                     f"Password length must be between {cls.MIN_LENGTH} and "
-                    "{cls.MAX_LENGTH} characters."
+                    f"{cls.MAX_LENGTH} characters."
                 ),
             }
 

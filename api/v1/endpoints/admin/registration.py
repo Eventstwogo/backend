@@ -38,8 +38,11 @@ async def create_admin_user(
     db: AsyncSession = Depends(get_db),
 ):
     try:
+        # Convert email to lowercase for case-insensitive storage and comparison
+        normalized_email = admin_data.email.strip().lower()
+        
         # Check if user with this email already exists
-        email_hash = hash_data(admin_data.email)
+        email_hash = hash_data(normalized_email)
         existing_user_stmt = select(AdminUser).where(AdminUser.email_hash == email_hash)
         existing_user_result = await db.execute(existing_user_stmt)
         existing_user = existing_user_result.scalar_one_or_none()
@@ -84,8 +87,8 @@ async def create_admin_user(
         # Generate unique user ID
         user_id = generate_lower_uppercase(length=6)
         
-        # Encrypt sensitive data
-        encrypted_email = encrypt_data(admin_data.email)
+        # Encrypt sensitive data (use normalized lowercase email)
+        encrypted_email = encrypt_data(normalized_email)
         
         # Hash password
         hashed_password = pwd_context.hash(admin_data.password)
@@ -113,7 +116,7 @@ async def create_admin_user(
         
         try:
             email_sent = email_service.send_admin_welcome_email(
-                email=admin_data.email,
+                email=normalized_email,  # Use normalized email for sending
                 username=admin_data.username,
                 password=admin_data.password,  # Send the plain password in email
                 role="SUPERADMIN"
@@ -125,7 +128,7 @@ async def create_admin_user(
         return AdminCreateResponse(
             user_id=user_id,
             username=admin_data.username,
-            email=admin_data.email,
+            email=normalized_email,  # Return normalized email
             role_id=superadmin_role.role_id,
             message="Admin user created successfully" + (" and welcome email sent" if email_sent else " but email sending failed"),
             email_sent=email_sent
@@ -152,8 +155,11 @@ async def register_user(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     
+    # Convert email to lowercase for case-insensitive storage and comparison
+    normalized_email = user_data.email.strip().lower()
+    
     encrypted_username = encrypt_data(user_data.username)
-    encrypted_email = encrypt_data(user_data.email)
+    encrypted_email = encrypt_data(normalized_email)
 
     # Check if encrypted data length is within database limits
     if len(encrypted_username) > 500:
@@ -170,7 +176,7 @@ async def register_user(
             log_error=True,
         )
 
-    email_hash = hash_data(user_data.email)
+    email_hash = hash_data(normalized_email)
 
     # Check if user already exists
     unique_user_result = await validate_unique_user(db, email_hash)
@@ -202,7 +208,7 @@ async def register_user(
     
     # Generate random password and send credentials via email
     plain_password, hashed_password, email_sent = generate_and_send_admin_credentials(
-        email=user_data.email,
+        email=normalized_email,  # Use normalized email
         username=user_data.username,
         logo_url=logo_url
     )
@@ -241,7 +247,7 @@ async def register_user(
         message=message,
         data=AdminRegisterResponse(
             user_id=user_id,
-            email=user_data.email,
+            email=normalized_email,  # Return normalized email
             username=user_data.username,
             password=plain_password,
         ),

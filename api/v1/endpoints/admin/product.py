@@ -75,6 +75,10 @@ async def create_product(
         vendor_check = result.scalars().first()
         if not vendor_check:
             return APIResponse.response(StatusCode.NOT_FOUND, "Vendor not found", log_error=True)
+        
+        # Check if username is "unknown" (vendor) vs vendor employee
+        if vendor_check.username != "unknown":
+            return APIResponse.response(StatusCode.NOT_FOUND, "Vendor not found", log_error=True)
 
         # Validate category
         result = await db.execute(select(Category).filter(Category.category_id == cat_id))

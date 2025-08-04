@@ -39,7 +39,7 @@ def contains_xss(content: str) -> bool:
         content (str): The content to check for XSS patterns
 
     Returns:
-        bool: True if XSS-like script tags are found, False otherwise
+        bool: True if XSS-like patterns are found, False otherwise
 
     Use cases:
         - Pre-validation of user input before processing
@@ -53,7 +53,25 @@ def contains_xss(content: str) -> bool:
         False
     """
     content_lower: str = content.lower()
-    return bool(re.search(r"<\s*script[^>]*>", content_lower))
+    
+    # Common XSS patterns
+    xss_patterns = [
+        r"<\s*script[^>]*>",           # <script> tags
+        r"<\s*iframe[^>]*>",          # <iframe> tags
+        r"<\s*object[^>]*>",          # <object> tags
+        r"<\s*embed[^>]*>",           # <embed> tags
+        r"<\s*form[^>]*>",            # <form> tags
+        r"javascript\s*:",            # javascript: protocol
+        r"vbscript\s*:",              # vbscript: protocol
+        r"data\s*:",                  # data: protocol
+        r"on\w+\s*=",                 # event handlers (onclick, onload, etc.)
+        r"expression\s*\(",           # CSS expression()
+        r"<\s*meta[^>]*http-equiv",   # meta refresh
+        r"<\s*link[^>]*>",            # link tags
+        r"<\s*style[^>]*>",           # style tags
+    ]
+    
+    return any(re.search(pattern, content_lower) for pattern in xss_patterns)
 
 
 def contains_sql_injection(content: str) -> bool:
@@ -64,7 +82,7 @@ def contains_sql_injection(content: str) -> bool:
         content (str): The content to check for SQL injection patterns
 
     Returns:
-        bool: True if SQL injection keywords are detected, False otherwise
+        bool: True if SQL injection patterns are detected, False otherwise
 
     Use cases:
         - Input validation for database queries
@@ -77,32 +95,51 @@ def contains_sql_injection(content: str) -> bool:
         >>> contains_sql_injection('normal search term')
         False
     """
-    sql_keywords: list[str] = [
-        "select",
-        "insert",
-        "update",
-        "delete",
-        "drop",
-        "truncate",
-        "exec",
-        "union",
-        "--",
-        ";",
-        "or 1=1",
-        "' or",
-        '" or',
-    ]
     content_lower: str = content.lower()
-    return any(keyword in content_lower for keyword in sql_keywords)
+    
+    # SQL injection patterns
+    sql_patterns = [
+        r"'\s*or\s+",                    # ' OR
+        r'"\s*or\s+',                    # " OR
+        r";\s*drop\s+",                  # ; DROP
+        r";\s*delete\s+",                # ; DELETE
+        r";\s*insert\s+",                # ; INSERT
+        r";\s*update\s+",                # ; UPDATE
+        r";\s*create\s+",                # ; CREATE
+        r";\s*alter\s+",                 # ; ALTER
+        r";\s*truncate\s+",              # ; TRUNCATE
+        r"union\s+select",               # UNION SELECT
+        r"exec\s*\(",                    # EXEC(
+        r"execute\s*\(",                 # EXECUTE(
+        r"sp_\w+",                       # stored procedures
+        r"xp_\w+",                       # extended procedures
+        r"--\s*",                        # SQL comments
+        r"/\*.*\*/",                     # SQL block comments
+        r"'\s*;\s*--",                   # '; --
+        r'"\s*;\s*--',                   # "; --
+        r"or\s+1\s*=\s*1",              # OR 1=1
+        r"and\s+1\s*=\s*1",             # AND 1=1
+        r"'\s*=\s*'",                    # '='
+        r'"\s*=\s*"',                    # "="
+        r"char\s*\(",                    # CHAR(
+        r"ascii\s*\(",                   # ASCII(
+        r"substring\s*\(",               # SUBSTRING(
+        r"waitfor\s+delay",              # WAITFOR DELAY
+        r"benchmark\s*\(",               # BENCHMARK(
+        r"sleep\s*\(",                   # SLEEP(
+    ]
+    
+    return any(re.search(pattern, content_lower) for pattern in sql_patterns)
 
 
 def sanitize_input(content: Optional[str]) -> str:
     """
     Fully sanitizes user input:
-    - Removes <script> tags and their content (XSS protection)
+    - Removes dangerous HTML tags and their content (XSS protection)
     - Strips all other HTML tags
     - Escapes HTML special characters (&, <, >, etc.)
-    - Removes basic SQL injection characters (", ', ;, `, --)
+    - Removes SQL injection characters and patterns
+    - Removes JavaScript protocols and event handlers
 
     Args:
         content (Optional[str]): Raw user input
@@ -116,19 +153,38 @@ def sanitize_input(content: Optional[str]) -> str:
     # Trim whitespace
     content = content.strip()
 
-    # Remove <script>...</script> content
-    content = re.sub(
-        r"<script.*?>.*?</script>", "", content, flags=re.IGNORECASE | re.DOTALL
-    )
+    # Remove dangerous HTML tags and their content
+    dangerous_tags = [
+        r"<script.*?>.*?</script>",
+        r"<iframe.*?>.*?</iframe>",
+        r"<object.*?>.*?</object>",
+        r"<embed.*?>.*?</embed>",
+        r"<form.*?>.*?</form>",
+        r"<style.*?>.*?</style>",
+        r"<link.*?>",
+        r"<meta.*?>",
+    ]
+    
+    for tag_pattern in dangerous_tags:
+        content = re.sub(tag_pattern, "", content, flags=re.IGNORECASE | re.DOTALL)
 
     # Remove all other HTML tags
     content = re.sub(r"<.*?>", "", content)
 
+    # Remove JavaScript and VBScript protocols
+    content = re.sub(r"javascript\s*:", "", content, flags=re.IGNORECASE)
+    content = re.sub(r"vbscript\s*:", "", content, flags=re.IGNORECASE)
+    content = re.sub(r"data\s*:", "", content, flags=re.IGNORECASE)
+
+    # Remove event handlers
+    content = re.sub(r"on\w+\s*=\s*[\"'][^\"']*[\"']", "", content, flags=re.IGNORECASE)
+
     # Escape HTML special characters
     content = html.escape(content)
 
-    # Remove common SQL injection characters
+    # Remove SQL injection characters and patterns
     content = re.sub(r"[\"';`]|--", "", content)
+    content = re.sub(r"/\*.*?\*/", "", content, flags=re.DOTALL)
 
     return content.strip()
 

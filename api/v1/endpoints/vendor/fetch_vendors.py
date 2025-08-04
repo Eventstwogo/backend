@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 
 from utils.id_generators import decrypt_data, decrypt_dict_values
 from utils.file_uploads import get_media_url
-from db.models.superadmin import BusinessProfile, VendorLogin, VendorCategoryManagement, Category, SubCategory, Product, Industries
+from db.models.superadmin import BusinessProfile, Role, VendorLogin, VendorCategoryManagement, Category, SubCategory, Product, Industries
 from db.sessions.database import get_db
 from schemas.vendor_details import AllVendorsResponse, VendorDetailsResponse, VendorProductsAndCategoriesResponse
 
@@ -239,7 +239,8 @@ async def get_vendor_details(
    
     # Fetch vendor login
     stmt = select(VendorLogin).where(
-        VendorLogin.user_id == user_id
+        VendorLogin.user_id == user_id,
+        VendorLogin.username == "unknown"
     )
     result = await db.execute(stmt)
     vendor = result.scalar_one_or_none()
@@ -266,10 +267,19 @@ async def get_vendor_details(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to decrypt profile details: {str(e)}")
 
+    # Decrypt email
+    decrypted_email = vendor.email
+    try:
+        decrypted_email = decrypt_data(vendor.email)
+    except Exception as e:
+        print(f"Failed to decrypt email for vendor {vendor.user_id}: {str(e)}")
+        # Keep original email if decryption fails
+        decrypted_email = vendor.email
+
     return {
         "vendor_login": {
             "user_id": vendor.user_id,
-            "email": vendor.email,
+            "email": decrypted_email,
             "is_verified": vendor.is_verified,
             "is_active": vendor.is_active,
             "last_login": vendor.last_login,
@@ -322,32 +332,41 @@ async def get_vendor_details(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to decrypt profile details: {str(e)}")
    
+    # Step 4: Decrypt email
+    decrypted_email = vendor.email
+    try:
+        decrypted_email = decrypt_data(vendor.email)
+    except Exception as e:
+        print(f"Failed to decrypt email for vendor {vendor.user_id}: {str(e)}")
+        # Keep original email if decryption fails
+        decrypted_email = vendor.email
+
     # Calculate years in business from ABN registration date
-        years_in_business = "0 years 0 months"  # Default value
-       
-        if business_profile and business_profile.abn_id:
-            try:
-                # Decrypt ABN ID to get the actual ABN number  
-                decrypted_abn = decrypt_data(business_profile.abn_id)
-                abn_registration_date = await fetch_abn_registration_date(decrypted_abn)
-               
-                if abn_registration_date:
-                    years_in_business = calculate_years_in_business_from_abn(abn_registration_date)
-                else:
-                    # Fallback to account creation date if ABN date not available
-                    years_in_business = calculate_years_in_business(vendor.created_at)
-            except Exception as e:
-                print(f"Error calculating ABN-based years in business for vendor {vendor.user_id}: {e}")
-                # Fallback to account creation date
+    years_in_business = "0 years 0 months"  # Default value
+   
+    if business_profile and business_profile.abn_id:
+        try:
+            # Decrypt ABN ID to get the actual ABN number  
+            decrypted_abn = decrypt_data(business_profile.abn_id)
+            abn_registration_date = await fetch_abn_registration_date(decrypted_abn)
+           
+            if abn_registration_date:
+                years_in_business = calculate_years_in_business_from_abn(abn_registration_date)
+            else:
+                # Fallback to account creation date if ABN date not available
                 years_in_business = calculate_years_in_business(vendor.created_at)
-        else:
-            # No business profile or ABN, use account creation date
+        except Exception as e:
+            print(f"Error calculating ABN-based years in business for vendor {vendor.user_id}: {e}")
+            # Fallback to account creation date
             years_in_business = calculate_years_in_business(vendor.created_at)
+    else:
+        # No business profile or ABN, use account creation date
+        years_in_business = calculate_years_in_business(vendor.created_at)
  
     return {
         "vendor_login": {
             "user_id": vendor.user_id,
-            "email": vendor.email,
+            "email": decrypted_email,
             "is_verified": vendor.is_verified,
             "is_active": vendor.is_active,
             "last_login": vendor.last_login,
@@ -432,7 +451,7 @@ async def get_vendor_details(
 async def get_all_vendors(db: AsyncSession = Depends(get_db)):
     stmt = select(VendorLogin).options(
         joinedload(VendorLogin.business_profile).joinedload(BusinessProfile.industry_obj)
-    )
+    ).where(VendorLogin.username == "unknown")
     result = await db.execute(stmt)
     vendors = result.scalars().all()
 
@@ -492,7 +511,7 @@ async def get_all_vendor_details(db: AsyncSession = Depends(get_db)):
     # Fetch all vendors with their business profiles
     stmt = select(VendorLogin).options(
         joinedload(VendorLogin.business_profile).joinedload(BusinessProfile.industry_obj)
-    )
+    ).where(VendorLogin.username == "unknown")
     result = await db.execute(stmt)
     vendors = result.scalars().all()
     
@@ -665,3 +684,91 @@ async def get_vendor_products_and_categories(
         total_products=len(products_info),
         category_management=category_management_info
     )
+
+
+@router.get("/all-vendors-and-employees", response_model=list[dict])
+async def get_all_vendors_and_employees(db: AsyncSession = Depends(get_db)):
+    """
+    Get all vendors and employees with proper identification.
+    - If username = "unknown", it's a vendor
+    - If username != "unknown", it's a vendor employee
+    """
+    stmt = select(VendorLogin, Role.role_name).outerjoin(
+        Role, VendorLogin.role == Role.role_id
+    ).options(
+        joinedload(VendorLogin.business_profile).joinedload(BusinessProfile.industry_obj)
+    )
+    result = await db.execute(stmt)
+    all_users = result.all()
+
+    all_users_data = []
+
+    for user_data in all_users:
+        vendor_login, role_name = user_data
+        business_profile = vendor_login.business_profile
+
+        # Decrypt email
+        try:
+            decrypted_email = decrypt_data(vendor_login.email)
+        except Exception:
+            decrypted_email = "encrypted_email"
+
+        # Determine user type based on username
+        if vendor_login.username == "unknown":
+            user_type = "vendor"
+            username_display = "N/A"  # Vendors don't have usernames
+        else:
+            user_type = "vendor_employee"
+            # For employees, try to decrypt username
+            try:
+                username_display = decrypt_data(vendor_login.username)
+            except Exception:
+                username_display = "encrypted_username"
+
+        # Decrypt profile_details if present
+        decrypted_profile_details = {}
+        if business_profile and business_profile.profile_details:
+            try:
+                raw_data = business_profile.profile_details
+                if isinstance(raw_data, str):
+                    raw_data = json.loads(raw_data)
+                decrypted_profile_details = decrypt_dict_values(raw_data)
+            except Exception as e:
+                decrypted_profile_details = {"error": f"Decryption failed: {str(e)}"}
+
+        industry_name = (
+            business_profile.industry_obj.industry_name
+            if business_profile and business_profile.industry_obj
+            else None
+        )
+
+        user_data_dict = {
+            "user_type": user_type,
+            "vendor_login": {
+                "user_id": vendor_login.user_id,
+                "username": username_display,
+                "email": decrypted_email,
+                "is_verified": vendor_login.is_verified,
+                "is_active": vendor_login.is_active,
+                "last_login": vendor_login.last_login,
+                "created_at": vendor_login.created_at,
+                "role_id": vendor_login.role,
+                "role_name": role_name,
+                "vendor_ref_id": vendor_login.vendor_ref_id,
+            },
+            "business_profile": {
+                "store_name": business_profile.store_name if business_profile else None,
+                "store_slug": business_profile.store_slug if business_profile else None,
+                "industry_id": business_profile.industry if business_profile else None,
+                "industry_name": industry_name,
+                "location": business_profile.location if business_profile else None,
+                "is_approved": business_profile.is_approved if business_profile else None,
+                "profile_details": decrypted_profile_details,
+                "purpose": business_profile.purpose if business_profile else {},
+                "payment_preference": business_profile.payment_preference if business_profile else [],
+            },
+        }
+
+        all_users_data.append(user_data_dict)
+
+    return all_users_data

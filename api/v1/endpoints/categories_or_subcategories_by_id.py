@@ -29,6 +29,7 @@ from utils.security_validators import (
 from utils.validators import (
     is_meaningful,
     is_valid_category_name,
+    is_valid_subcategory_name,
     validate_length,
 )
 
@@ -185,24 +186,44 @@ async def update_category_or_subcategory(
     final_slug = getattr(item, slug_field)
 
     # Name
+    name_updated = False
     if is_meaningful(name):
-        name = sanitize_input(name)
-        if not is_valid_category_name(name):
+        # Security validation for name
+        if contains_xss(name) or contains_sql_injection(name):
             return api_response(
-                status.HTTP_400_BAD_REQUEST, f"Invalid {model_type} name."
+                status.HTTP_400_BAD_REQUEST,
+                "Name contains potentially malicious content."
             )
+        
+        name = sanitize_input(name)
+        if model_type == "category":
+            if not is_valid_category_name(name):
+                return api_response(
+                    status.HTTP_400_BAD_REQUEST, f"Invalid {model_type} name."
+                )
+        else:
+            if not is_valid_subcategory_name(name):
+                return api_response(
+                    status.HTTP_400_BAD_REQUEST, f"Invalid {model_type} name."
+                )
         setattr(item, name_field, name.upper())
         updated = True
+        name_updated = True
 
     # Industry ID (only for categories)
     if industry_id and industry_id.strip() and model_type == "category":
         item.industry_id = industry_id.strip()
         updated = True
 
-    # Slug
-    if is_meaningful(slug) or is_meaningful(name):
-        # Use slug if given, else generate from name
-        base_slug = slug if is_meaningful(slug) else name
+    # Slug - Update slug when name is updated or when slug is explicitly provided
+    if is_meaningful(slug) or name_updated:
+        # Use slug if given, else generate from updated name
+        if is_meaningful(slug):
+            base_slug = slug
+        else:
+            # Generate slug from the updated name
+            base_slug = name
+        
         base_slug = sanitize_input(base_slug)
         if contains_xss(base_slug) or contains_sql_injection(base_slug):
             return api_response(
@@ -229,6 +250,13 @@ async def update_category_or_subcategory(
     # Description
     if is_meaningful(description):
         assert description is not None
+        # Security validation for description
+        if contains_xss(description) or contains_sql_injection(description):
+            return api_response(
+                status.HTTP_400_BAD_REQUEST,
+                "Description contains potentially malicious content."
+            )
+        
         description = sanitize_input(description).strip()
         if not validate_length(description, 0, 500):
             return api_response(
@@ -241,6 +269,13 @@ async def update_category_or_subcategory(
     # Meta Title
     if is_meaningful(meta_title):
         assert meta_title is not None
+        # Security validation for meta title
+        if contains_xss(meta_title) or contains_sql_injection(meta_title):
+            return api_response(
+                status.HTTP_400_BAD_REQUEST,
+                "Meta title contains potentially malicious content."
+            )
+        
         meta_title = sanitize_input(meta_title).strip()
         if not validate_length(meta_title, 0, 70):
             return api_response(
@@ -253,6 +288,13 @@ async def update_category_or_subcategory(
     # Meta Description
     if is_meaningful(meta_description):
         assert meta_description is not None
+        # Security validation for meta description
+        if contains_xss(meta_description) or contains_sql_injection(meta_description):
+            return api_response(
+                status.HTTP_400_BAD_REQUEST,
+                "Meta description contains potentially malicious content."
+            )
+        
         meta_description = sanitize_input(meta_description).strip()
         if not validate_length(meta_description, 0, 160):
             return api_response(

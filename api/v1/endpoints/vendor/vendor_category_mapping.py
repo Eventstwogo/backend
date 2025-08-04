@@ -397,7 +397,7 @@ async def total_categories_count(
     total_categories = len(category_map)
     active_categories = sum(
         1 for subs in category_map.values()
-        if any(item["is_active"] is True for item in subs)
+        if any(item["is_active"] is False for item in subs)
     )
     inactive_categories = total_categories - active_categories
 
@@ -416,7 +416,7 @@ async def total_categories_count(
 
     for cat_id, sub_entries in category_map.items():
         total = len(sub_entries)
-        active = sum(1 for s in sub_entries if s["is_active"])
+        active = sum(1 for s in sub_entries if s["is_active"] is False)
         inactive = total - active
 
         total_subcategories += total

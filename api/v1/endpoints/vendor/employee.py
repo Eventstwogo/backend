@@ -9,7 +9,7 @@ import math
 
 from core.api_response import api_response
 from utils.id_generators import generate_digits_letters, hash_data, encrypt_data, decrypt_data, generate_employee_business_profile_id
-from db.models.superadmin import VendorLogin, Role, BusinessProfile
+from db.models.superadmin import VendorLogin, Role, BusinessProfile, VendorSignup
 from schemas.vendor_employee import (
     VendorEmployeeCreateRequest, 
     VendorEmployeeUpdateRequest,
@@ -66,6 +66,18 @@ async def create_vendor_employee(
         return api_response(
             status_code=status.HTTP_400_BAD_REQUEST,
             message=f"Role '{role.role_name}' is inactive and cannot be assigned"
+        )
+    
+    # Check if email already exists in ven_signup table
+    email_hash_for_signup = hash_data(employee_data.email)
+    signup_email_stmt = select(VendorSignup).where(VendorSignup.email_hash == email_hash_for_signup)
+    signup_email_result = await db.execute(signup_email_stmt)
+    existing_signup_email = signup_email_result.scalar_one_or_none()
+    
+    if existing_signup_email:
+        return api_response(
+            status_code=status.HTTP_409_CONFLICT,
+            message=f"This email '{employee_data.email}' is already registered for vendor signup. Please try with another email."
         )
     
     # Check if username is unique and prepare username data
@@ -235,6 +247,13 @@ async def get_vendor_employee_by_id(
     except Exception:
         decrypted_email = "encrypted_email"
     
+    # Check if username is "unknown" - not a vendor employee
+    if employee.username == "unknown":
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Employee not found"
+        )
+
     # Decrypt username for response
     decrypted_username = safe_decrypt_username(employee.username)
     
@@ -269,6 +288,13 @@ async def update_vendor_employee_by_id(
         return api_response(
             status_code=status.HTTP_404_NOT_FOUND,
             message=f"Employee with ID '{user_id}' not found"
+        )
+    
+    # Check if username is "unknown" - not a vendor employee
+    if employee.username == "unknown":
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Employee not found"
         )
     
     # Check if any data is provided for update
@@ -327,19 +353,32 @@ async def update_vendor_employee_by_id(
     if update_data.email:
         encrypted_email = encrypt_data(update_data.email)
         email_hash = hash_data(update_data.email)
-        email_stmt = select(VendorLogin).where(
+        
+        # Check if email exists in ven_signup table
+        signup_email_stmt = select(VendorSignup).where(VendorSignup.email_hash == email_hash)
+        signup_email_result = await db.execute(signup_email_stmt)
+        existing_signup_email = signup_email_result.scalar_one_or_none()
+        
+        if existing_signup_email:
+            return api_response(
+                status_code=status.HTTP_409_CONFLICT,
+                message="This email already registered for vendor"
+            )
+        
+        # Check if email exists in ven_login table (excluding current user)
+        login_email_stmt = select(VendorLogin).where(
             and_(
                 VendorLogin.email_hash == email_hash,
                 VendorLogin.user_id != user_id
             )
         )
-        email_result = await db.execute(email_stmt)
-        existing_email = email_result.scalar_one_or_none()
+        login_email_result = await db.execute(login_email_stmt)
+        existing_login_email = login_email_result.scalar_one_or_none()
         
-        if existing_email:
+        if existing_login_email:
             return api_response(
                 status_code=status.HTTP_409_CONFLICT,
-                message=f"Email '{update_data.email}' is already registered"
+                message="This email already registered for vendor"
             )
         
         employee.email = encrypted_email
@@ -392,6 +431,13 @@ async def soft_delete_vendor_employee_by_id(
             message=f"Employee with ID '{user_id}' not found"
         )
     
+    # Check if username is "unknown" - not a vendor employee
+    if employee.username == "unknown":
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Employee not found"
+        )
+    
     if employee.is_active:  # True means inactive
         return api_response(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -425,6 +471,13 @@ async def hard_delete_vendor_employee_by_id(
             message=f"Employee with ID '{user_id}' not found"
         )
     
+    # Check if username is "unknown" - not a vendor employee
+    if employee.username == "unknown":
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Employee not found"
+        )
+    
     await db.delete(employee)
     await db.commit()
     
@@ -450,6 +503,13 @@ async def restore_vendor_employee_by_id(
         return api_response(
             status_code=status.HTTP_404_NOT_FOUND,
             message=f"Employee with ID '{user_id}' not found"
+        )
+    
+    # Check if username is "unknown" - not a vendor employee
+    if employee.username == "unknown":
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Employee not found"
         )
     
     if not employee.is_active:  # False means active

@@ -5,23 +5,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 
 from core.api_response import api_response
-from db.models.superadmin import Category, Config, VendorSignup
+from db.models.superadmin import Category, Config, VendorSignup, VendorLogin
 
 
 async def validate_unique_user(db: AsyncSession, email_hash: str):
-    result = await db.execute(
-        select(VendorSignup).where(
-          
-                VendorSignup.email_hash == email_hash
-            
-        )
+    # First check if email exists in ven_signup table
+    signup_result = await db.execute(
+        select(VendorSignup).where(VendorSignup.email_hash == email_hash)
     )
-    existing_user = result.scalar_one_or_none()
+    existing_signup_user = signup_result.scalar_one_or_none()
 
-    if existing_user:
+    if existing_signup_user:
         return api_response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message="A user with the given email already exists.",
+            status_code=status.HTTP_409_CONFLICT,
+            message="Vendor user with given email already exists.",
+        )
+    
+    # Then check if email exists in ven_login table
+    login_result = await db.execute(
+        select(VendorLogin).where(VendorLogin.email_hash == email_hash)
+    )
+    existing_login_user = login_result.scalar_one_or_none()
+
+    if existing_login_user:
+        return api_response(
+            status_code=status.HTTP_409_CONFLICT,
+            message="Vendor employee already exists with given email.",
         )
 
 

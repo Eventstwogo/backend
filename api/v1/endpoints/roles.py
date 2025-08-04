@@ -148,6 +148,12 @@ async def update_role(
             log_error=True,
         )
 
+    if role.role_status:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,    
+            message="Cannot update an inactive role."
+        )
+
     if is_single_reserved_word(update_data.role_name):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

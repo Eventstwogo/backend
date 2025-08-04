@@ -142,12 +142,17 @@ async def update_category(
 
     # === Prepare inputs with fallback (handle None vs empty string properly) ===
     # For form data, empty strings should be treated as "no change intended"
+    name_updated = name is not None and name.strip() != ""
     input_name = (
         category.category_name if (name is None or name.strip() == "") else name
     )
-    input_slug = (
-        category.category_slug if (slug is None or slug.strip() == "") else slug
-    )
+    # If name is updated but no slug provided, use the updated name for slug
+    if name_updated and (slug is None or slug.strip() == ""):
+        input_slug = input_name
+    else:
+        input_slug = (
+            category.category_slug if (slug is None or slug.strip() == "") else slug
+        )
     input_description = (
         category.category_description
         if (description is None or description.strip() == "")
@@ -210,7 +215,8 @@ async def update_category(
     if name is not None and name.strip():
         assert input_name is not None
         category.category_name = input_name.upper()
-    if slug is not None and slug.strip():
+    # Update slug if explicitly provided OR if name was updated
+    if (slug is not None and slug.strip()) or name_updated:
         category.category_slug = final_slug
     if description is not None and description.strip():
         category.category_description = input_description

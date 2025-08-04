@@ -9,10 +9,15 @@ from core.api_response import api_response
 from core.config import PRIVATE_KEY, settings
 from db.models.superadmin import AdminUser
 from utils.auth import create_jwt_token, verify_password
+from utils.id_generators import hash_data
 
 
 async def fetch_user_by_email(db: AsyncSession, email: str) -> AdminUser | None:
-    result = await db.execute(select(AdminUser).where(AdminUser.email == email))
+    # Convert email to lowercase and hash it for lookup since emails are stored encrypted
+    # and email_hash is used for searches
+    normalized_email = email.strip().lower()
+    email_hash = hash_data(normalized_email)
+    result = await db.execute(select(AdminUser).where(AdminUser.email_hash == email_hash))
     return result.scalar_one_or_none()
 
 

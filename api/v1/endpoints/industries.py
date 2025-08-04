@@ -27,8 +27,9 @@ async def create_industry(
     industry: CreateIndustry,
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
+    # Case-insensitive duplicate check (industry_name is already validated and stripped by schema)
     result = await db.execute(
-        select(Industries).where(Industries.industry_name == industry.industry_name)
+        select(Industries).where(func.upper(Industries.industry_name) == func.upper(industry.industry_name))
     )
     existing = result.scalars().first()
 
@@ -40,7 +41,26 @@ async def create_industry(
                 log_error=True,
             )
         else:
+            # Check if the new slug conflicts with existing active industries
+            if existing.industry_slug != industry.industry_slug:
+                slug_result = await db.execute(
+                    select(Industries).where(
+                        Industries.industry_slug == industry.industry_slug,
+                        Industries.is_active == False
+                    )
+                )
+                existing_slug = slug_result.scalars().first()
+                
+                if existing_slug:
+                    return api_response(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        message="An industry with this slug already exists.",
+                        log_error=True,
+                    )
+            
             existing.is_active = False
+            existing.industry_name = industry.industry_name  # Already processed by schema
+            existing.industry_slug = industry.industry_slug  # Already processed by schema
             existing.timestamp = datetime.now(timezone.utc)
             await db.commit()
             await db.refresh(existing)
@@ -56,7 +76,21 @@ async def create_industry(
             detail="Python reserved words are not allowed in industry names.",
         )
 
+    # Check for duplicate slug
+    slug_result = await db.execute(
+        select(Industries).where(Industries.industry_slug == industry.industry_slug)
+    )
+    existing_slug = slug_result.scalars().first()
+    
+    if existing_slug:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="An industry with this slug already exists.",
+            log_error=True,
+        )
+
     industry_id = generate_digits_lowercase()
+    # Store industry data (name and slug already processed by schema)
     new_industry = Industries(
         industry_id=industry_id,
         industry_name=industry.industry_name,
@@ -143,17 +177,24 @@ async def update_industry(
             log_error=True,
         )
 
-    if is_single_reserved_word(update_data.industry_name):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Reserved words are not allowed in industry names.",
+    # Check if industry is inactive before allowing updates
+    if industry.is_active:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Cannot update an inactive industry."
         )
 
     if update_data.industry_name:
-        # Check for duplicate
+        if is_single_reserved_word(update_data.industry_name):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Reserved words are not allowed in industry names.",
+            )
+
+        # Case-insensitive duplicate check (industry_name is already validated and stripped by schema)
         dup_check = await db.execute(
             select(Industries).where(
-                Industries.industry_name == update_data.industry_name,
+                func.upper(Industries.industry_name) == func.upper(update_data.industry_name),
                 Industries.industry_id != industry_id,
             )
         )
@@ -162,9 +203,23 @@ async def update_industry(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 message="An industry with this name already exists.",
             )
+        # Store industry name in uppercase for consistency (already handled by schema)
         industry.industry_name = update_data.industry_name
 
     if update_data.industry_slug:
+        # Check for duplicate slug
+        slug_check = await db.execute(
+            select(Industries).where(
+                Industries.industry_slug == update_data.industry_slug,
+                Industries.industry_id != industry_id,
+            )
+        )
+        if slug_check.scalars().first():
+            return api_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="An industry with this slug already exists.",
+            )
+        # Store industry slug (already handled by schema)
         industry.industry_slug = update_data.industry_slug
 
     await db.commit()
@@ -199,7 +254,7 @@ async def update_industry_status(
 
     return api_response(
         status_code=status.HTTP_200_OK,
-        message=f"Industry status updated to {'Inactive' if is_active else 'Active'}.",
+        message=f"Industry status updated to {'Active' if not is_active else 'Inactive'}.",
         data=industry,
     )
 
@@ -220,10 +275,20 @@ async def delete_industry(
             message="Industry not found.",
         )
 
-    if industry.is_active and not hard_delete:
+    # Handle already soft-deleted industry
+    if industry.is_active is True:
+        if not hard_delete:
+            return api_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Industry is already soft-deleted.",
+                log_error=False,
+            )
+        # Proceed with hard delete
+        await db.delete(industry)
+        await db.commit()
         return api_response(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            message="Industry already soft-deleted.",
+            status_code=status.HTTP_200_OK,
+            message="Industry permanently deleted (hard delete).",
         )
 
     if hard_delete:
@@ -231,10 +296,10 @@ async def delete_industry(
         await db.commit()
         return api_response(
             status_code=status.HTTP_200_OK,
-            message="Industry permanently deleted.",
+            message="Industry permanently deleted (hard delete).",
         )
     else:
-        industry.is_active = True  # soft-delete flag
+        industry.is_active = True  # Soft delete
         await db.commit()
         return api_response(
             status_code=status.HTTP_200_OK,

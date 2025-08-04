@@ -11,7 +11,7 @@ from starlette.responses import JSONResponse
 from core.api_response import api_response
 from db.models.superadmin import AdminUser, Config, Role
 from schemas.admin_user import AdminUser as AdminUserSchema, PaginatedAdminListResponse
-from utils.id_generators import decrypt_data
+from utils.id_generators import decrypt_data, hash_data
 
 async def get_admin_user_analytics(
     db: AsyncSession,
@@ -163,7 +163,11 @@ async def get_user_by_email(
     db: AsyncSession, email: str
 ) -> JSONResponse | AdminUser:
     """Find a user by email and return either the user or an error response"""
-    result = await db.execute(select(AdminUser).where(AdminUser.email == email))
+    # Convert email to lowercase and hash it for lookup since emails are stored encrypted
+    # and email_hash is used for searches
+    normalized_email = email.strip().lower()
+    email_hash = hash_data(normalized_email)
+    result = await db.execute(select(AdminUser).where(AdminUser.email_hash == email_hash))
     user = result.scalar_one_or_none()
     if not user:
         return api_response(
