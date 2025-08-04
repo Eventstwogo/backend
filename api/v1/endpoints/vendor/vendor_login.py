@@ -2,9 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timedelta
+from datetime import datetime
 from passlib.context import CryptContext
-from pydantic import BaseModel
 
 from utils.id_generators import hash_data
 from db.models.superadmin import BusinessProfile, VendorLogin, VendorSignup
@@ -99,17 +98,20 @@ async def login_user(
     profile_result = await db.execute(profile_stmt)
     profile_data = profile_result.one_or_none()
 
-    is_approved, ref_number, industry = profile_data if profile_data else (-1, "", "")
+    is_approved, ref_number, industry = profile_data if profile_data else (-2, "", "")
+
 
     # Step 7: Determine onboarding_status
-    if user.is_verified and is_approved == 1:
+    if user.is_verified and is_approved == 2:
         onboarding_status = "approved"
-    elif not user.is_verified and is_approved == -1:
+    elif not user.is_verified and is_approved == -2:
         onboarding_status = "not_started"
-    elif not user.is_verified and is_approved == 2:
+    elif not user.is_verified and is_approved == -1 and ref_number:
         onboarding_status = "rejected"
+    elif not user.is_verified and is_approved == 1 and ref_number:
+        onboarding_status = "under_review"    
     elif not user.is_verified and is_approved == 0 and ref_number:
-        onboarding_status = "under_review"
+        onboarding_status = "submitted"
     else:
         onboarding_status = "unknown"
 

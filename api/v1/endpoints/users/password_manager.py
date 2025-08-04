@@ -185,7 +185,7 @@ async def change_password(
     
     # Step 1: Get user by user_id
     from sqlalchemy import select
-    from db.models.general import User
+    from db.models.superadmin import User
     
     user_result = await db.execute(
         select(User).where(User.user_id == user_id)

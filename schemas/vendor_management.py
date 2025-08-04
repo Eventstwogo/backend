@@ -23,3 +23,8 @@ class VendorStatusResponse(BaseModel):
     is_verified: int = Field(..., description="Vendor verification status")
     last_login: Optional[str] = Field(None, description="Last login timestamp")
     created_at: str = Field(..., description="Account creation timestamp")
+
+
+class RejectRequest(BaseModel):
+    comment: str 
+    

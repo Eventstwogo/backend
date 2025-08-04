@@ -3,11 +3,12 @@ from typing import Any, Dict, Optional
 import uuid
 
 from sqlalchemy.ext.mutable import MutableDict
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func, event
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, ForeignKey, Enum as SQLAlchemyEnum, UniqueConstraint, func, event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from slugify import slugify
 from db.models.base import Base
+from enum import Enum
 
 
 
@@ -313,21 +314,17 @@ class VendorLogin(Base):
     )
  
  
- 
- 
 class BusinessProfile(Base):
     __tablename__ = "ven_businessprofile"
  
     sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     abn_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     abn_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
- 
     profile_ref_id: Mapped[str] = mapped_column(
         String(length=6),
         ForeignKey("ven_login.business_profile_id"),
         unique=True
     )
- 
     profile_details: Mapped[dict] = mapped_column(JSONB, nullable=False)
     business_logo: Mapped[str] = mapped_column(String, nullable=True)
     payment_preference: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
@@ -339,26 +336,34 @@ class BusinessProfile(Base):
         ForeignKey("ven_industries.industry_id"),
         nullable=True
     )
- 
     location: Mapped[str] = mapped_column(String, nullable=True)
- 
-    # Keep this as unique (used in the relationship)
     ref_number: Mapped[str] = mapped_column(String(length=6), unique=True)
- 
     purpose: Mapped[dict] = mapped_column(JSONB, nullable=False)
     is_approved: Mapped[int] = mapped_column(Integer, default=False)
+    reviewer_comment: Mapped[str] = mapped_column(Text, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
- 
- 
+    approved_date: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+
+    
     industry_obj: Mapped["Industries"] = relationship(
         "Industries", back_populates="business_profiles", lazy="joined"
     )
- 
     vendor_login: Mapped["VendorLogin"] = relationship(
         "VendorLogin",
         back_populates="business_profile",
         uselist=False
     )
+
+
+class AdminVendorEnquiries(Base):
+    __tablename__ = "admin_vendor_enquiries"
+    sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement= True)
+    vendor_id: Mapped[str] = mapped_column(String, nullable=False)
+    admin_id:  Mapped[str] = mapped_column(String, nullable=False)
+    enquiry: Mapped[str]= mapped_column(String, nullable=False)
+    answers: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    status: Mapped[int] = mapped_column(Integer, default=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 # Event listener to automatically generate store_slug from store_name
@@ -492,3 +497,34 @@ class Product(Base):
     # Relationships
     category: Mapped["Category"] = relationship(back_populates="products")
     subcategory: Mapped[Optional["SubCategory"]] = relationship(back_populates="products")
+
+
+class EnquiryStatus(Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+ 
+   
+class Enquiry(Base):
+    __tablename__ = "user_contact_us"
+ 
+    enquiry_id: Mapped[int] = mapped_column(
+        primary_key=True, autoincrement=True
+    )
+    firstname: Mapped[str] = mapped_column(String(100), nullable=False)
+    lastname: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    enquiry_status: Mapped[EnquiryStatus] = mapped_column(
+        SQLAlchemyEnum(EnquiryStatus),
+        default=EnquiryStatus.PENDING,
+        nullable=False,
+    )
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), server_default=func.now()
+    )

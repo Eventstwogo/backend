@@ -365,6 +365,69 @@ async def get_vendor_details(
     }
 
 
+
+# @router.get("/vendors/all", response_model=list[dict])
+# async def get_all_vendors(db: AsyncSession = Depends(get_db)):
+#     # Exclude vendors with username "unknown"
+#     stmt = (
+#         select(VendorLogin)
+#         .where(VendorLogin.username == "unknown") 
+#         .options(
+#             joinedload(VendorLogin.business_profile).joinedload(BusinessProfile.industry_obj)
+#         )
+#     )
+    
+#     result = await db.execute(stmt)
+#     vendors = result.scalars().all()
+
+#     all_vendor_data = []
+
+#     for vendor in vendors:
+#         business_profile = vendor.business_profile
+
+#         # Decrypt profile_details if present
+#         decrypted_profile_details = {}
+#         if business_profile and business_profile.profile_details:
+#             try:
+#                 raw_data = business_profile.profile_details
+#                 if isinstance(raw_data, str):
+#                     raw_data = json.loads(raw_data)
+#                 decrypted_profile_details = decrypt_dict_values(raw_data)
+#             except Exception as e:
+#                 decrypted_profile_details = {"error": f"Decryption failed: {str(e)}"}
+
+#         decrypted_email = decrypt_data(vendor.email)
+
+#         industry_name = (
+#             business_profile.industry_obj.industry_name
+#             if business_profile and business_profile.industry_obj
+#             else None
+#         )
+
+#         all_vendor_data.append({
+#             "vendor_login": {
+#                 "user_id": vendor.user_id,
+#                 "email": decrypted_email,
+#                 "is_verified": vendor.is_verified,
+#                 "is_active": vendor.is_active,
+#                 "last_login": vendor.last_login,
+#                 "created_at": vendor.created_at,
+#             },
+#             "business_profile": {
+#                 "store_name": business_profile.store_name if business_profile else None,
+#                 "store_slug": business_profile.store_slug if business_profile else None,
+#                 "industry_id": business_profile.industry if business_profile else None,
+#                 "industry_name": industry_name,
+#                 "location": business_profile.location if business_profile else None,
+#                 "is_approved": business_profile.is_approved if business_profile else None,
+#                 "profile_details": decrypted_profile_details,
+#                 "purpose": business_profile.purpose if business_profile else {},
+#                 "payment_preference": business_profile.payment_preference if business_profile else [],
+#             },
+#         })
+
+#     return all_vendor_data
+
 @router.get("/vendors/all", response_model=list[dict])
 async def get_all_vendors(db: AsyncSession = Depends(get_db)):
     stmt = select(VendorLogin).options(

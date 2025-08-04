@@ -16,6 +16,88 @@ from sqlalchemy.orm import selectinload
 
 router = APIRouter()
 
+# @router.post("/add")
+# async def add_vendor_category_mapping(
+#     payload: VendorCategoryRequest,
+#     db: AsyncSession = Depends(get_db)
+# ):
+#     # 1. Check if category exists
+#     cat_stmt = select(Category).where(Category.category_id == payload.category_id)
+#     cat_result = await db.execute(cat_stmt)
+#     category = cat_result.scalar_one_or_none()
+#     if not category:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Category ID {payload.category_id} not found."
+#         )
+
+#     # 2. If subcategory is provided, check if it exists and belongs to the category
+#     if payload.subcategory_id:
+#         sub_stmt = select(SubCategory).where(
+#             SubCategory.subcategory_id == payload.subcategory_id,
+#             SubCategory.category_id == payload.category_id
+#         )
+#         sub_result = await db.execute(sub_stmt)
+#         subcategory = sub_result.scalar_one_or_none()
+#         if not subcategory:
+#             raise HTTPException(
+#                 status_code=status.HTTP_404_NOT_FOUND,
+#                 detail=(
+#                     f"SubCategory ID {payload.subcategory_id} not found "
+#                     f"or does not belong to Category ID {payload.category_id}."
+#                 )
+#             )
+
+#     # 3. Check for existing (vendor, category, subcategory) combination
+#     check_full_stmt = select(VendorCategoryManagement).where(
+#         VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
+#         VendorCategoryManagement.category_id == payload.category_id,
+#         VendorCategoryManagement.subcategory_id == payload.subcategory_id
+#     )
+#     full_result = await db.execute(check_full_stmt)
+#     if full_result.scalar_one_or_none():
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="This vendor-category-subcategory mapping already exists."
+#         )
+
+#     # 4. Check for existing (vendor, category) mapping regardless of subcategory
+#     check_partial_stmt = select(VendorCategoryManagement).where(
+#         VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
+#         VendorCategoryManagement.category_id == payload.category_id,
+#         VendorCategoryManagement.subcategory_id.is_(None)
+#         if payload.subcategory_id is not None
+#         else VendorCategoryManagement.subcategory_id.isnot(None)
+#     )
+#     partial_result = await db.execute(check_partial_stmt)
+#     if partial_result.scalar_one_or_none():
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="A conflicting vendor-category mapping already exists."
+#         )
+
+#     # 5. Save to VendorCategoryManagement
+#     new_entry = VendorCategoryManagement(
+#         vendor_ref_id=payload.vendor_ref_id,
+#         category_id=payload.category_id,
+#         subcategory_id=payload.subcategory_id  # can be None
+#     )
+
+#     db.add(new_entry)
+#     try:
+#         await db.commit()
+#     except Exception as e:
+#         await db.rollback()
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Failed to add vendor-category mapping: " + str(e)
+#         )
+
+#     return {
+#         "status": "success",
+#         "message": "Vendor category mapping added successfully."
+#     }
+
 @router.post("/add")
 async def add_vendor_category_mapping(
     payload: VendorCategoryRequest,
@@ -61,20 +143,8 @@ async def add_vendor_category_mapping(
             detail="This vendor-category-subcategory mapping already exists."
         )
 
-    # 4. Check for existing (vendor, category) mapping regardless of subcategory
-    check_partial_stmt = select(VendorCategoryManagement).where(
-        VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
-        VendorCategoryManagement.category_id == payload.category_id,
-        VendorCategoryManagement.subcategory_id.is_(None)
-        if payload.subcategory_id is not None
-        else VendorCategoryManagement.subcategory_id.isnot(None)
-    )
-    partial_result = await db.execute(check_partial_stmt)
-    if partial_result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A conflicting vendor-category mapping already exists."
-        )
+    # 4. Remove the conflicting mapping check to allow independent subcategory mappings
+    # (Commenting out or removing the previous step 4 logic)
 
     # 5. Save to VendorCategoryManagement
     new_entry = VendorCategoryManagement(
@@ -97,8 +167,6 @@ async def add_vendor_category_mapping(
         "status": "success",
         "message": "Vendor category mapping added successfully."
     }
-
-
 
 @router.post("/remove")
 async def remove_vendor_category_mapping(
