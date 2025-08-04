@@ -16,7 +16,7 @@ from api.v1.endpoints import (
 )
 
 
-from api.v1.endpoints.vendor import vendor_signup, email_verification, business_profile, vendor_login, vendor_onboarding, fetch_vendors, employee, password_manager as vendor_password_manager
+from api.v1.endpoints.vendor import vendor_signup, email_verification, business_profile, vendor_login, vendor_onboarding, fetch_vendors, employee, password_manager as vendor_password_manager, queries
 from api.v1.endpoints.admin import registration, admin_login, password_manager, product, vendor_approval, admin_users
 from api.v1.endpoints.vendor import vendor_category_mapping
 from api.v1.endpoints.users import register, login, password_manager as user_password_manager, user_management
@@ -152,4 +152,8 @@ api_router.include_router(
 
 api_router.include_router(
     contactus.router, prefix="/users/CustomerContactPage", tags=["Customer Contact Page"]
+)
+
+api_router.include_router(
+    queries.router, prefix="/users/vendor_admin_queries", tags=["Vendor Admin Queries"]
 )
