@@ -114,6 +114,8 @@ class Settings(BaseSettings):
     JWT_ISSUER: str = "e2g-api"
     JWT_AUDIENCE: str = "e2g-admin"
 
+    FERNET_KEY: str = ""
+
     # === DigitalOcean Spaces ===
     SPACES_REGION_NAME: str = "syd1"
     SPACES_ENDPOINT_URL: str = "https://syd1.digitaloceanspaces.com"
@@ -159,6 +161,8 @@ class Settings(BaseSettings):
         self.SPACES_BUCKET_NAME = secrets.get("SPACES_BUCKET_NAME", self.SPACES_BUCKET_NAME)
         self.SPACES_ACCESS_KEY_ID = secrets.get("SPACES_ACCESS_KEY", self.SPACES_ACCESS_KEY_ID)
         self.SPACES_SECRET_ACCESS_KEY = secrets.get("SPACES_SECRET_KEY", self.SPACES_SECRET_ACCESS_KEY)
+        self.FERNET_KEY = secrets.get("FERNET_KEY", self.FERNET_KEY)
+        print(self.FERNET_KEY)
         logger.info(f"Updated database settings: user={self.POSTGRES_USER}, host={self.POSTGRES_HOST}, port={self.POSTGRES_PORT}, db={self.POSTGRES_DB}")
 
 @lru_cache()

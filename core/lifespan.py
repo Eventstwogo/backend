@@ -110,6 +110,7 @@ async def lifespan(app: FastAPI):
         settings.POSTGRES_PASSWORD = secrets.get("DB_PASSWORD", settings.POSTGRES_PASSWORD)
         settings.POSTGRES_PORT = int(secrets.get("DB_PORT", settings.POSTGRES_PORT))
         settings.POSTGRES_USER = secrets.get("DB_USER", secrets.get("DATABASE", settings.POSTGRES_USER))
+        
 
         logger.info("🔐 Vault secrets fetched successfully")
         logger.info(
@@ -117,6 +118,7 @@ async def lifespan(app: FastAPI):
             f"user={settings.POSTGRES_USER}, host={settings.POSTGRES_HOST}, port={settings.POSTGRES_PORT}, db={settings.POSTGRES_DB}"
         )
         logger.info(f"🔗 Final DATABASE_URL: {settings.DATABASE_URL}")
+        
 
         # 2️⃣ Initialize DB engine and session
         await init_db()

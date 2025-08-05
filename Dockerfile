@@ -5,14 +5,13 @@ FROM python:3.10-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
+
 # Install system dependencies and PostgreSQL libraries
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    libpq-dev \
-    build-essential \
-    libreoffice \
-    unoconv \
-    && rm -rf /var/lib/apt/lists/*
+apt-get install -y --no-install-recommends \
+libpq-dev \
+build-essential \
+&& rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
 WORKDIR /app

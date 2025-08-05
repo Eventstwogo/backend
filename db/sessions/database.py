@@ -36,7 +36,7 @@ async def init_db():
 
     _engine = create_async_engine(
         database_url,
-        echo=settings.DEBUG,
+        # echo=settings.DEBUG,
         future=True,
     )
 
