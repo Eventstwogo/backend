@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence, Tuple
 
 from fastapi import status
-from sqlalchemy import case, func, select, or_, and_
+from sqlalchemy import case, func, select, or_, and_, update
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,8 +10,15 @@ from starlette.responses import JSONResponse
 
 from core.api_response import api_response
 from db.models.superadmin import AdminUser, Config, Role
-from schemas.admin_user import AdminUser as AdminUserSchema, PaginatedAdminListResponse
-from utils.id_generators import decrypt_data, hash_data
+from schemas.admin_user import (
+    AdminUser as AdminUserSchema, 
+    PaginatedAdminListResponse,
+    AdminUpdateRequest,
+    AdminUpdateResponse,
+    AdminDeleteResponse,
+    AdminRestoreResponse
+)
+from utils.id_generators import decrypt_data, hash_data, encrypt_data
 
 async def get_admin_user_analytics(
     db: AsyncSession,
@@ -195,7 +202,7 @@ async def get_all_admin_users(
         count_query = select(func.count(AdminUser.user_id))
         
         # Apply filters
-        conditions = []
+        conditions = [AdminUser.is_active == False]  # Only show active users (is_active=False means active)
         
         if search:
             # Since username and email are encrypted, we need to search differently
@@ -209,9 +216,9 @@ async def get_all_admin_users(
         if is_active is not None:
             conditions.append(AdminUser.is_active == is_active)
         
-        if conditions:
-            query = query.where(and_(*conditions))
-            count_query = count_query.where(and_(*conditions))
+        # Always apply conditions (at minimum, exclude soft deleted users)
+        query = query.where(and_(*conditions))
+        count_query = count_query.where(and_(*conditions))
         
         # Get total count
         total_result = await db.execute(count_query)
@@ -284,5 +291,398 @@ async def get_all_admin_users(
         return api_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=f"Failed to retrieve admin users: {str(e)}",
+            log_error=True,
+        )
+
+
+async def validate_unique_username_email_for_update(
+    db: AsyncSession, 
+    user_id: str, 
+    username: Optional[str] = None, 
+    email: Optional[str] = None
+) -> JSONResponse | None:
+    """Validate that username and email are unique when updating a user"""
+    conditions = []
+    
+    if username:
+        encrypted_username = encrypt_data(username)
+        conditions.append(AdminUser.username == encrypted_username)
+    
+    if email:
+        email_hash = hash_data(email.lower())
+        conditions.append(AdminUser.email_hash == email_hash)
+    
+    if not conditions:
+        return None
+    
+    # Check if any other user (excluding current user) has the same username or email
+    query = select(AdminUser).where(
+        and_(
+            AdminUser.user_id != user_id,
+            or_(*conditions)
+        )
+    )
+    
+    result = await db.execute(query)
+    existing_user = result.scalar_one_or_none()
+    
+    if existing_user:
+        if username and existing_user.username == encrypt_data(username):
+            return api_response(
+                status_code=status.HTTP_409_CONFLICT,
+                message="Username already exists.",
+                log_error=True,
+            )
+        if email and existing_user.email_hash == hash_data(email.lower()):
+            return api_response(
+                status_code=status.HTTP_409_CONFLICT,
+                message="Email already exists.",
+                log_error=True,
+            )
+    
+    return None
+
+
+async def validate_superadmin_role_change(
+    db: AsyncSession, 
+    user_id: str, 
+    new_role_id: str
+) -> JSONResponse | None:
+    """Validate superadmin role changes to ensure only one superadmin exists"""
+    # Get the new role
+    role_result = await validate_role(db, new_role_id)
+    if isinstance(role_result, JSONResponse):
+        return role_result
+    
+    new_role = role_result
+    
+    # If changing to superadmin role, check if another superadmin exists
+    if new_role.role_name.lower() in {"superadmin", "super admin"}:
+        existing_superadmin_query = await db.execute(
+            select(AdminUser).where(
+                and_(
+                    AdminUser.role_id == new_role_id,
+                    AdminUser.user_id != user_id,
+                    AdminUser.is_active == False  # is_active=False means active
+                )
+            )
+        )
+        if existing_superadmin_query.scalar_one_or_none():
+            return api_response(
+                status_code=status.HTTP_409_CONFLICT,
+                message="Super Admin already exists. Only one Super Admin is allowed.",
+                log_error=True,
+            )
+    
+    # If changing from superadmin role, ensure there will still be at least one superadmin
+    current_user_result = await get_user_by_id(db, user_id)
+    if isinstance(current_user_result, JSONResponse):
+        return current_user_result
+    
+    current_user = current_user_result
+    current_role_query = await db.execute(
+        select(Role).where(Role.role_id == current_user.role_id)
+    )
+    current_role = current_role_query.scalar_one_or_none()
+    
+    if (current_role and 
+        current_role.role_name.lower() in {"superadmin", "super admin"} and
+        new_role.role_name.lower() not in {"superadmin", "super admin"}):
+        
+        # Check if there are other active superadmins
+        other_superadmins_query = await db.execute(
+            select(AdminUser).where(
+                and_(
+                    AdminUser.role_id == current_role.role_id,
+                    AdminUser.user_id != user_id,
+                    AdminUser.is_active == False  # is_active=False means active
+                )
+            )
+        )
+        if not other_superadmins_query.scalar_one_or_none():
+            return api_response(
+                status_code=status.HTTP_409_CONFLICT,
+                message="Cannot change role. At least one active Super Admin must exist.",
+                log_error=True,
+            )
+    
+    return None
+
+
+async def update_admin_user(
+    db: AsyncSession, 
+    user_id: str, 
+    update_data: AdminUpdateRequest
+) -> JSONResponse | AdminUpdateResponse:
+    """Update an admin user"""
+    # Get the user
+    user_result = await get_user_by_id(db, user_id)
+    if isinstance(user_result, JSONResponse):
+        return user_result
+    
+    user = user_result
+    
+    # Check if user is inactive (soft deleted)
+    if user.is_active == True:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="User not found or has been deleted.",
+            log_error=True,
+        )
+    
+    # Validate uniqueness for username and email
+    uniqueness_error = await validate_unique_username_email_for_update(
+        db, user_id, update_data.username, update_data.email
+    )
+    if uniqueness_error:
+        return uniqueness_error
+    
+    # Validate role change if role_id is being updated
+    if update_data.role_id:
+        role_error = await validate_superadmin_role_change(db, user_id, update_data.role_id)
+        if role_error:
+            return role_error
+    
+    try:
+        # Prepare update data
+        update_values = {"updated_at": datetime.now(timezone.utc)}
+        
+        if update_data.username:
+            update_values["username"] = encrypt_data(update_data.username)
+        
+        if update_data.email:
+            normalized_email = update_data.email.lower()
+            update_values["email"] = encrypt_data(normalized_email)
+            update_values["email_hash"] = hash_data(normalized_email)
+        
+        if update_data.role_id:
+            update_values["role_id"] = update_data.role_id
+        
+        # Update the user
+        await db.execute(
+            update(AdminUser)
+            .where(AdminUser.user_id == user_id)
+            .values(**update_values)
+        )
+        await db.commit()
+        
+        # Get updated user data
+        updated_user_result = await get_user_by_id(db, user_id)
+        if isinstance(updated_user_result, JSONResponse):
+            return updated_user_result
+        
+        updated_user = updated_user_result
+        
+        return AdminUpdateResponse(
+            user_id=updated_user.user_id,
+            username=decrypt_data(updated_user.username),
+            email=decrypt_data(updated_user.email),
+            role_id=updated_user.role_id,
+            message="Admin user updated successfully."
+        )
+        
+    except Exception as e:
+        await db.rollback()
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to update admin user: {str(e)}",
+            log_error=True,
+        )
+
+
+async def soft_delete_admin_user(
+    db: AsyncSession, 
+    user_id: str
+) -> JSONResponse | AdminDeleteResponse:
+    """Soft delete an admin user"""
+    # Get the user
+    user_result = await get_user_by_id(db, user_id)
+    if isinstance(user_result, JSONResponse):
+        return user_result
+    
+    user = user_result
+    
+    # Check if user is already inactive (soft deleted)
+    if user.is_active == True:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="User not found or has already been deleted.",
+            log_error=True,
+        )
+    
+    # Check if user is a superadmin and if there are other active superadmins
+    role_query = await db.execute(
+        select(Role).where(Role.role_id == user.role_id)
+    )
+    role = role_query.scalar_one_or_none()
+    
+    if role and role.role_name.lower() in {"superadmin", "super admin"}:
+        # Check if there are other active superadmins
+        other_superadmins_query = await db.execute(
+            select(AdminUser).where(
+                and_(
+                    AdminUser.role_id == user.role_id,
+                    AdminUser.user_id != user_id,
+                    AdminUser.is_active == False  # is_active=False means active
+                )
+            )
+        )
+        if not other_superadmins_query.scalar_one_or_none():
+            return api_response(
+                status_code=status.HTTP_409_CONFLICT,
+                message="Cannot delete the last active Super Admin.",
+                log_error=True,
+            )
+    
+    try:
+        # Soft delete the user (set is_active to True, meaning inactive)
+        await db.execute(
+            update(AdminUser)
+            .where(AdminUser.user_id == user_id)
+            .values(
+                is_active=True,
+                updated_at=datetime.now(timezone.utc)
+            )
+        )
+        await db.commit()
+        
+        return AdminDeleteResponse(
+            user_id=user_id,
+            message="Admin user deleted successfully."
+        )
+        
+    except Exception as e:
+        await db.rollback()
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to delete admin user: {str(e)}",
+            log_error=True,
+        )
+
+
+async def restore_admin_user(
+    db: AsyncSession, 
+    user_id: str
+) -> JSONResponse | AdminRestoreResponse:
+    """Restore a soft deleted admin user"""
+    # Get the user (including soft deleted ones)
+    result = await db.execute(
+        select(AdminUser).where(AdminUser.user_id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="User not found.",
+            log_error=True,
+        )
+    
+    # Check if user is not inactive (not soft deleted)
+    if user.is_active == False:
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="User is not deleted and cannot be restored.",
+            log_error=True,
+        )
+    
+    # Check for username and email conflicts with active users
+    decrypted_username = decrypt_data(user.username)
+    decrypted_email = decrypt_data(user.email)
+    
+    conflict_error = await validate_unique_username_email_for_update(
+        db, user_id, decrypted_username, decrypted_email
+    )
+    if conflict_error:
+        return api_response(
+            status_code=status.HTTP_409_CONFLICT,
+            message="Cannot restore user. Username or email conflicts with existing active user.",
+            log_error=True,
+        )
+    
+    try:
+        # Restore the user (set is_active to False, meaning active)
+        await db.execute(
+            update(AdminUser)
+            .where(AdminUser.user_id == user_id)
+            .values(
+                is_active=False,
+                updated_at=datetime.now(timezone.utc)
+            )
+        )
+        await db.commit()
+        
+        return AdminRestoreResponse(
+            user_id=user_id,
+            message="Admin user restored successfully."
+        )
+        
+    except Exception as e:
+        await db.rollback()
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to restore admin user: {str(e)}",
+            log_error=True,
+        )
+
+
+async def hard_delete_admin_user(
+    db: AsyncSession, 
+    user_id: str
+) -> JSONResponse | AdminDeleteResponse:
+    """Permanently delete an admin user"""
+    # Get the user (including soft deleted ones)
+    result = await db.execute(
+        select(AdminUser).where(AdminUser.user_id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="User not found.",
+            log_error=True,
+        )
+    
+    # Check if user is an active superadmin and if there are other active superadmins
+    if user.is_active == False:  # User is active (is_active=False means active)
+        role_query = await db.execute(
+            select(Role).where(Role.role_id == user.role_id)
+        )
+        role = role_query.scalar_one_or_none()
+        
+        if role and role.role_name.lower() in {"superadmin", "super admin"}:
+            # Check if there are other active superadmins
+            other_superadmins_query = await db.execute(
+                select(AdminUser).where(
+                    and_(
+                        AdminUser.role_id == user.role_id,
+                        AdminUser.user_id != user_id,
+                        AdminUser.is_active == False  # is_active=False means active
+                    )
+                )
+            )
+            if not other_superadmins_query.scalar_one_or_none():
+                return api_response(
+                    status_code=status.HTTP_409_CONFLICT,
+                    message="Cannot delete the last active Super Admin.",
+                    log_error=True,
+                )
+    
+    try:
+        # Hard delete the user
+        await db.delete(user)
+        await db.commit()
+        
+        return AdminDeleteResponse(
+            user_id=user_id,
+            message="Admin user permanently deleted."
+        )
+        
+    except Exception as e:
+        await db.rollback()
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to permanently delete admin user: {str(e)}",
             log_error=True,
         )

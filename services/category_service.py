@@ -148,6 +148,12 @@ def validate_category_data(
                 detail="Meta description too long. Max 160 characters allowed.",
             )
 
+    # Preserve empty strings instead of converting to None
+    # Only convert None to empty string to ensure consistency
+    description = description if description is not None else ""
+    meta_title = meta_title if meta_title is not None else ""
+    meta_description = meta_description if meta_description is not None else ""
+    
     return name.upper(), slug.lower(), description, meta_title, meta_description
 
 
@@ -680,3 +686,108 @@ async def check_subcategory_vs_category_conflicts(
             return "Subcategory meta description cannot match category meta description."
 
     return None
+
+
+# === Category-Subcategory Status Management ===
+
+async def activate_category_with_subcategories(
+    db: AsyncSession, category: Category
+) -> None:
+    """
+    Activate a category and all its subcategories.
+    
+    Args:
+        db: Database session
+        category: Category instance to activate
+    """
+    # Activate the category (False = active, True = inactive)
+    category.category_status = False
+    
+    # Activate all subcategories under this category
+    for subcategory in category.subcategories:
+        subcategory.subcategory_status = False
+
+
+async def deactivate_category_with_subcategories(
+    db: AsyncSession, category: Category
+) -> None:
+    """
+    Deactivate a category and all its subcategories.
+    
+    Args:
+        db: Database session
+        category: Category instance to deactivate
+    """
+    # Deactivate the category (True = inactive, False = active)
+    category.category_status = True
+    
+    # Deactivate all subcategories under this category
+    for subcategory in category.subcategories:
+        subcategory.subcategory_status = True
+
+
+async def validate_subcategory_activation(
+    db: AsyncSession, subcategory: SubCategory
+) -> None:
+    """
+    Validate that a subcategory can be activated by checking if its parent category is active.
+    
+    Args:
+        db: Database session
+        subcategory: Subcategory instance to validate
+        
+    Raises:
+        HTTPException: If parent category is inactive
+    """
+    # Get the parent category
+    result = await db.execute(
+        select(Category).filter_by(category_id=subcategory.category_id)
+    )
+    parent_category = result.scalars().first()
+    
+    if not parent_category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Parent category not found"
+        )
+    
+    # Check if parent category is inactive (True = inactive)
+    if parent_category.category_status:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot activate subcategory because its parent category is inactive. Please activate the parent category first."
+        )
+
+
+async def activate_subcategory(
+    db: AsyncSession, subcategory: SubCategory
+) -> None:
+    """
+    Activate a subcategory after validating its parent category is active.
+    
+    Args:
+        db: Database session
+        subcategory: Subcategory instance to activate
+        
+    Raises:
+        HTTPException: If parent category is inactive
+    """
+    # Validate that parent category is active
+    await validate_subcategory_activation(db, subcategory)
+    
+    # Activate the subcategory (False = active)
+    subcategory.subcategory_status = False
+
+
+async def deactivate_subcategory(
+    db: AsyncSession, subcategory: SubCategory
+) -> None:
+    """
+    Deactivate a subcategory (no parent validation needed).
+    
+    Args:
+        db: Database session
+        subcategory: Subcategory instance to deactivate
+    """
+    # Deactivate the subcategory (True = inactive)
+    subcategory.subcategory_status = True

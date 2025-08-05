@@ -1,12 +1,24 @@
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 
 from core.api_response import api_response
 from db.sessions.database import get_db
-from schemas.admin_user import PaginatedAdminListResponse
-from services.admin_user import get_all_admin_users
+from schemas.admin_user import (
+    PaginatedAdminListResponse,
+    AdminUpdateRequest,
+    AdminUpdateResponse,
+    AdminDeleteResponse,
+    AdminRestoreResponse
+)
+from services.admin_user import (
+    get_all_admin_users,
+    update_admin_user,
+    soft_delete_admin_user,
+    restore_admin_user,
+    hard_delete_admin_user
+)
 from utils.exception_handlers import exception_handler
 
 router = APIRouter()
@@ -63,4 +75,116 @@ async def get_admin_users(
         status_code=status.HTTP_200_OK,
         message="Admin users retrieved successfully.",
         data=result,
+    )
+
+
+@router.put(
+    "/{user_id}",
+    response_model=AdminUpdateResponse,
+    status_code=status.HTTP_200_OK,
+)
+@exception_handler
+async def update_admin_user_by_id(
+    user_id: str = Path(..., description="Admin user ID to update"),
+    update_data: AdminUpdateRequest = ...,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Update an admin user by ID.
+    
+    Admin users can update their username, email, and role_id.
+    Validates that username and email are unique and ensures only one superadmin exists.
+    """
+    result = await update_admin_user(db=db, user_id=user_id, update_data=update_data)
+
+    if isinstance(result, JSONResponse):
+        return result
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message=result.message,
+        data=result.model_dump(),
+    )
+
+
+@router.delete(
+    "/{user_id}/soft",
+    response_model=AdminDeleteResponse,
+    status_code=status.HTTP_200_OK,
+)
+@exception_handler
+async def soft_delete_admin_user_by_id(
+    user_id: str = Path(..., description="Admin user ID to soft delete"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Soft delete an admin user by ID.
+    
+    The user will be marked as deleted but not permanently removed from the database.
+    Prevents deletion of the last active superadmin.
+    """
+    result = await soft_delete_admin_user(db=db, user_id=user_id)
+
+    if isinstance(result, JSONResponse):
+        return result
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message=result.message,
+        data=result.model_dump(),
+    )
+
+
+@router.post(
+    "/{user_id}/restore",
+    response_model=AdminRestoreResponse,
+    status_code=status.HTTP_200_OK,
+)
+@exception_handler
+async def restore_admin_user_by_id(
+    user_id: str = Path(..., description="Admin user ID to restore"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Restore a soft deleted admin user by ID.
+    
+    Validates that username and email don't conflict with existing active users.
+    """
+    result = await restore_admin_user(db=db, user_id=user_id)
+
+    if isinstance(result, JSONResponse):
+        return result
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message=result.message,
+        data=result.model_dump(),
+    )
+
+
+@router.delete(
+    "/{user_id}/hard",
+    response_model=AdminDeleteResponse,
+    status_code=status.HTTP_200_OK,
+)
+@exception_handler
+async def hard_delete_admin_user_by_id(
+    user_id: str = Path(..., description="Admin user ID to permanently delete"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Permanently delete an admin user by ID.
+    
+    This action cannot be undone. The user will be completely removed from the database.
+    Prevents deletion of the last active superadmin.
+    """
+    result = await hard_delete_admin_user(db=db, user_id=user_id)
+
+    if isinstance(result, JSONResponse):
+        return result
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message=result.message,
+        data=result.model_dump(),
     )

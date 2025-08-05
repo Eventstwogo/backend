@@ -23,6 +23,8 @@ from services.category_service import (
     check_subcategory_conflicts,
     check_subcategory_vs_category_conflicts,
     validate_subcategory_fields,
+    activate_subcategory,
+    deactivate_subcategory,
 )
 from utils.exception_handlers import exception_handler
 from utils.file_uploads import get_media_url, save_uploaded_file
@@ -108,16 +110,16 @@ async def update_subcategory_by_slug(
 
     #  Apply fallback for unchanged fields
     name_updated = name is not None and name.strip() != ""
-    input_name = name or subcategory.subcategory_name
+    input_name = name if name is not None else subcategory.subcategory_name
     # If name is updated but no slug provided, use the updated name for slug
     if name_updated and not new_slug:
         input_slug = input_name
     else:
-        input_slug = new_slug or subcategory.subcategory_slug
-    input_description = description or subcategory.subcategory_description
-    input_meta_title = meta_title or subcategory.subcategory_meta_title
+        input_slug = new_slug if new_slug is not None else subcategory.subcategory_slug
+    input_description = description if description is not None else subcategory.subcategory_description
+    input_meta_title = meta_title if meta_title is not None else subcategory.subcategory_meta_title
     input_meta_description = (
-        meta_description or subcategory.subcategory_meta_description
+        meta_description if meta_description is not None else subcategory.subcategory_meta_description
     )
 
     #  Validate fields
@@ -168,11 +170,14 @@ async def update_subcategory_by_slug(
     # Update slug if explicitly provided OR if name was updated
     if new_slug or name_updated:
         subcategory.subcategory_slug = final_slug
-    if description:
+    if description is not None:
+        # Save empty strings as empty strings (not NULL)
         subcategory.subcategory_description = cleaned_description
-    if meta_title:
+    if meta_title is not None:
+        # Save empty strings as empty strings (not NULL)
         subcategory.subcategory_meta_title = cleaned_meta_title
-    if meta_description:
+    if meta_description is not None:
+        # Save empty strings as empty strings (not NULL)
         subcategory.subcategory_meta_description = cleaned_meta_description
     if featured is not None:
         subcategory.featured_subcategory = featured
@@ -235,7 +240,8 @@ async def soft_delete_subcategory_by_slug(
             status.HTTP_400_BAD_REQUEST, "Subcategory already inactive"
         )
 
-    subcategory.subcategory_status = True
+    # Deactivate the subcategory
+    await deactivate_subcategory(db, subcategory)
     await db.commit()
 
     return api_response(
@@ -261,7 +267,8 @@ async def restore_subcategory_by_slug(
             status.HTTP_400_BAD_REQUEST, "Subcategory is already active"
         )
 
-    subcategory.subcategory_status = False
+    # Activate the subcategory (with parent category validation)
+    await activate_subcategory(db, subcategory)
     await db.commit()
 
     return api_response(status.HTTP_200_OK, "Subcategory restored successfully")

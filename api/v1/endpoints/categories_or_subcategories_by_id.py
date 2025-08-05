@@ -18,6 +18,12 @@ from core.api_response import api_response
 from core.config import settings
 from db.models.superadmin import Category, SubCategory, Industries
 from db.sessions.database import get_db
+from services.category_service import (
+    activate_category_with_subcategories,
+    deactivate_category_with_subcategories,
+    activate_subcategory,
+    deactivate_subcategory,
+)
 from utils.exception_handlers import exception_handler
 from utils.file_uploads import get_media_url, save_uploaded_file
 from utils.format_validators import is_valid_filename
@@ -248,10 +254,9 @@ async def update_category_or_subcategory(
         updated = True
 
     # Description
-    if is_meaningful(description):
-        assert description is not None
+    if description is not None:
         # Security validation for description
-        if contains_xss(description) or contains_sql_injection(description):
+        if description.strip() and (contains_xss(description) or contains_sql_injection(description)):
             return api_response(
                 status.HTTP_400_BAD_REQUEST,
                 "Description contains potentially malicious content."
@@ -263,14 +268,14 @@ async def update_category_or_subcategory(
                 status.HTTP_400_BAD_REQUEST,
                 "Description too long. Max 500 characters.",
             )
+        # Save empty strings as empty strings (not NULL)
         setattr(item, desc_field, description)
         updated = True
 
     # Meta Title
-    if is_meaningful(meta_title):
-        assert meta_title is not None
+    if meta_title is not None:
         # Security validation for meta title
-        if contains_xss(meta_title) or contains_sql_injection(meta_title):
+        if meta_title.strip() and (contains_xss(meta_title) or contains_sql_injection(meta_title)):
             return api_response(
                 status.HTTP_400_BAD_REQUEST,
                 "Meta title contains potentially malicious content."
@@ -282,14 +287,14 @@ async def update_category_or_subcategory(
                 status.HTTP_400_BAD_REQUEST,
                 "Meta title too long. Max 70 characters.",
             )
+        # Save empty strings as empty strings (not NULL)
         setattr(item, meta_title_field, meta_title)
         updated = True
 
     # Meta Description
-    if is_meaningful(meta_description):
-        assert meta_description is not None
+    if meta_description is not None:
         # Security validation for meta description
-        if contains_xss(meta_description) or contains_sql_injection(meta_description):
+        if meta_description.strip() and (contains_xss(meta_description) or contains_sql_injection(meta_description)):
             return api_response(
                 status.HTTP_400_BAD_REQUEST,
                 "Meta description contains potentially malicious content."
@@ -301,6 +306,7 @@ async def update_category_or_subcategory(
                 status.HTTP_400_BAD_REQUEST,
                 "Meta description too long. Max 160 characters.",
             )
+        # Save empty strings as empty strings (not NULL)
         setattr(item, meta_desc_field, meta_description)
         updated = True
 
@@ -375,9 +381,8 @@ async def soft_delete_category_or_subcategory(
                 status.HTTP_400_BAD_REQUEST, "Category already inactive"
             )
 
-        category.category_status = True
-        for sub in category.subcategories:
-            sub.subcategory_status = True
+        # Deactivate category and all its subcategories
+        await deactivate_category_with_subcategories(db, category)
 
         await db.commit()
         return api_response(
@@ -397,7 +402,8 @@ async def soft_delete_category_or_subcategory(
                 status.HTTP_400_BAD_REQUEST, "Subcategory already inactive"
             )
 
-        subcategory.subcategory_status = True
+        # Deactivate the subcategory
+        await deactivate_subcategory(db, subcategory)
         await db.commit()
         return api_response(
             status.HTTP_200_OK,
@@ -430,9 +436,8 @@ async def restore_category_or_subcategory(
                 status.HTTP_400_BAD_REQUEST, "Category is already active"
             )
 
-        category.category_status = False
-        for sub in category.subcategories:
-            sub.subcategory_status = False
+        # Activate category and all its subcategories
+        await activate_category_with_subcategories(db, category)
 
         await db.commit()
         return api_response(
@@ -452,7 +457,8 @@ async def restore_category_or_subcategory(
                 status.HTTP_400_BAD_REQUEST, "Subcategory is already active"
             )
 
-        subcategory.subcategory_status = False
+        # Activate the subcategory (with parent category validation)
+        await activate_subcategory(db, subcategory)
         await db.commit()
         return api_response(
             status.HTTP_200_OK,
