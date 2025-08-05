@@ -76,7 +76,7 @@ Login Details:
 - Email: {email}
 - Username: {username}
 - Password: {password}
-- Admin Panel URL: {settings.FRONTEND_URL}/admin
+- Admin Panel URL: {settings.ADMIN_FRONTEND_URL}/
 
 IMPORTANT SECURITY NOTICE:
 - Please change your password immediately after your first login

@@ -17,9 +17,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from core.secrets_dependencies import fetch_secrets_from_vault
 from keys.key_manager import KeyManager
 
-# Remove environment variable override for database settings
-os.environ.pop("ENVIRONMENT", None)  # Prevent override
-load_dotenv(dotenv_path=".env.local", override=True)
+# # Remove environment variable override for database settings
+# os.environ.pop("ENVIRONMENT", None)  # Prevent override
+# load_dotenv(dotenv_path=".env.local", override=True)
 
 class Settings(BaseSettings):
     """
@@ -36,7 +36,9 @@ class Settings(BaseSettings):
     APP_PORT: int = 8000
     LOG_LEVEL: str = "info"
     DEBUG: bool = True
-    FRONTEND_URL: str = "http://localhost:3000"
+    ADMIN_FRONTEND_URL: str = "https://admin.shoppersky.com.au"
+    VENDOR_FRONTEND_URL: str = "https://vendor.shoppersky.com.au"
+    USERS_APPLICATION_FRONTEND_URL: str = "https://shoppersky.com.au"
     DESCRIPTION: str = (
         "Shoppersky application for managing products, users and their purchases."
     )
@@ -175,19 +177,20 @@ class Settings(BaseSettings):
 
     # === DigitalOcean Spaces ===
     SPACES_REGION_NAME: str = "syd1"
-    SPACES_ENDPOINT_URL: str = "https://syd1.digitaloceanspaces.com"
+    SPACES_ENDPOINT_URL: str = f"https://{SPACES_REGION_NAME}.digitaloceanspaces.com"
     SPACES_BUCKET_NAME: str = "shoppersky"
     SPACES_ACCESS_KEY_ID: str = "spaces-access-key-id"
     SPACES_SECRET_ACCESS_KEY: str = "spaces-secret-access-key"
 
     @property
     def SPACES_PUBLIC_URL(self) -> str:
-        """Returns public URL to access the DigitalOcean Spaces bucket."""
-        return f"https://{self.SPACES_BUCKET_NAME}.{self.SPACES_REGION_NAME}.digitaloceanspaces.com"
+        return (
+            f"{self.SPACES_ENDPOINT_URL.rstrip('/')}/{self.SPACES_BUCKET_NAME}"
+        )
 
     # === Meta Configuration for Pydantic ===
     model_config = SettingsConfigDict(
-        env_file=".env.local",
+        env_file=".env.production",
         env_file_encoding="utf-8",
         extra="allow",
     )

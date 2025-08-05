@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import string
 from typing import Dict, Union
@@ -219,6 +220,42 @@ def is_valid_ipv4(ip: str) -> bool:
     """
     return bool(re.fullmatch(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$", ip))
 
+def sanitize_filename(name: str, default_ext: str = "txt") -> str:
+    """
+    Sanitizes and returns a safe filename by removing invalid characters.
+
+    Args:
+        name (str): Input filename
+        default_ext (str): Default extension to use if missing (default: 'txt')
+
+    Returns:
+        str: A safe, sanitized filename
+
+    Examples:
+        >>> sanitize_filename("file<>name?.pdf")
+        'filename.pdf'
+        >>> sanitize_filename("weird*name")
+        'weirdname.txt'
+    """
+    # Split filename and extension
+    base, ext = os.path.splitext(name)
+
+    # Remove unwanted characters from base (keep letters, numbers, underscore, hyphen, space)
+    base = re.sub(r"[^\w\s-]", "", base).strip()
+
+    # Replace spaces with underscores (optional)
+    base = re.sub(r"[\s]+", "_", base)
+
+    # Sanitize extension: remove leading dot, allow only letters (1 to 5 chars)
+    ext = re.sub(r"[^\w]", "", ext.lstrip("."))
+    if not ext or len(ext) > 5:
+        ext = default_ext
+
+    # Ensure the base has at least one character
+    if not base:
+        base = "file"
+
+    return f"{base}.{ext}"
 
 def is_valid_hex_color(value: str) -> bool:
     """

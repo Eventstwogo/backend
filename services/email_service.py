@@ -72,7 +72,7 @@ class EmailTemplateService:
             context.update({
                 'current_year': datetime.now(tz=timezone.utc).year,
                 'company_name': 'Shoppersky',
-                'frontend_url': settings.FRONTEND_URL
+                'frontend_url': settings.USERS_APPLICATION_FRONTEND_URL
             })
             return template.render(**context)
         except Exception as e:
@@ -174,7 +174,7 @@ class EmailTemplateService:
             'username': username,
             'email': email,
             'password': password,
-            'login_url': login_url or settings.FRONTEND_URL,
+            'login_url': login_url or settings.USERS_APPLICATION_FRONTEND_URL,
             'header_subtitle': 'Welcome to our platform!'
         }
         
@@ -316,7 +316,7 @@ class EmailTemplateService:
             'email': email,
             'password': password,
             'role': role,
-            'admin_panel_url': admin_panel_url or f"{settings.FRONTEND_URL}/admin",
+            'admin_panel_url': admin_panel_url or f"{settings.ADMIN_FRONTEND_URL}",
             'creation_date': datetime.now(tz=timezone.utc).strftime("%B %d, %Y at %I:%M %p UTC"),
             'header_subtitle': 'Administrator access granted'
         }
@@ -345,7 +345,7 @@ class EmailTemplateService:
             'email': email,
             'reference_number': reference_number,
             'status': status,
-            'vendor_portal_url': vendor_portal_url or f"{settings.FRONTEND_URL}/vendor",
+            'vendor_portal_url': vendor_portal_url or f"{settings.VENDOR_FRONTEND_URL}/",
             'creation_date': datetime.now(tz=timezone.utc).strftime("%B %d, %Y at %I:%M %p UTC"),
             'support_phone': support_phone,
             'header_subtitle': 'Your vendor account is ready',
@@ -374,7 +374,7 @@ class EmailTemplateService:
             'vendor_email': vendor_email,
             'business_name': business_name,
             'verification_token': verification_token,
-            'verification_link': verification_link or f"{settings.FRONTEND_URL}/emailconfirmation?token={verification_token}",
+            'verification_link': verification_link or f"{settings.VENDOR_FRONTEND_URL}/emailconfirmation?token={verification_token}",
             'expiry_minutes': expiry_minutes,
             'registration_date': datetime.now(tz=timezone.utc).strftime("%B %d, %Y at %I:%M %p UTC"),
             'header_subtitle': 'Verify your vendor account to get started'
@@ -431,7 +431,7 @@ class EmailTemplateService:
             'password': password,
             'role_name': role_name,
             'business_name': business_name,
-            'vendor_portal_url': vendor_portal_url or f"{settings.FRONTEND_URL}/vendor",
+            'vendor_portal_url': vendor_portal_url or f"{settings.VENDOR_FRONTEND_URL}/",
             'creation_date': datetime.now(tz=timezone.utc).strftime("%B %d, %Y at %I:%M %p UTC"),
             'header_subtitle': 'Your vendor employee account is ready'
         }
@@ -556,7 +556,7 @@ def send_user_verification_email(
     """Send user verification email with verification link"""
     try:
         print(f"Attempting to send verification email to: {email}")
-        verification_link = f"{settings.FRONTEND_URL}/verify-email/{verification_token}?email={email}"
+        verification_link = f"{settings.USERS_APPLICATION_FRONTEND_URL}/verify-email/{verification_token}?email={email}"
         
         context = {
             'username': username,

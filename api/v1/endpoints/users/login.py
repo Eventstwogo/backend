@@ -728,6 +728,7 @@ async def get_user_by_id(
         last_name=decrypted_last_name,
         email=decrypted_email,
         phone_number=decrypted_phone,
+        is_active=user.is_active,
     )
     
     return api_response(

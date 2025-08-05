@@ -139,7 +139,7 @@ Your account has been created successfully.
 Login Details:
 - Email: {email}
 - Password: {password}
-- Login URL: {settings.FRONTEND_URL}
+- Login URL: {settings.USERS_APPLICATION_FRONTEND_URL}
 
 Please change your password after your first login for security.
 
@@ -183,7 +183,7 @@ Admin Details:
 - Username: {username}
 - Password: {password}
 - Role: {role}
-- Admin Panel: {settings.FRONTEND_URL}/admin
+- Admin Panel: {settings.ADMIN_FRONTEND_URL}
 
 Please change your password after your first login for security.
 
@@ -225,7 +225,7 @@ Vendor Details:
 - Vendor Name: {vendor_name}
 - Vendor ID: {vendor_id}
 - Email: {email}
-- Vendor Portal: {settings.FRONTEND_URL}/vendor
+- Vendor Portal: {settings.VENDOR_FRONTEND_URL}
 
 You can now start adding products and managing your store.
 
