@@ -377,6 +377,14 @@ async def update_query_status(
             status.HTTP_404_NOT_FOUND, "Query not found", log_error=True
         )
 
+    # Check if query is already closed
+    if query.query_status == QueryStatus.QUERY_CLOSED:
+        return api_response(
+            status.HTTP_400_BAD_REQUEST,
+            "Cannot update status for closed queries",
+            log_error=True,
+        )
+
     query.query_status = request.query_status
     query.updated_at = datetime.now(timezone.utc)
     if not query.receiver_user_id:

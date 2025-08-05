@@ -131,6 +131,7 @@ def create_app() -> FastAPI:
         openapi_url="/shoppersky.json",
         lifespan=lifespan,
         debug=settings.ENVIRONMENT == "development",
+        redirect_slashes=True,
     )
 
     @app.get("/", tags=["System"])

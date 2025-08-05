@@ -218,7 +218,6 @@ async def forgot_password(
         reset_link=reset_link,
         expiry_minutes=60,  # 1 hour expiry
         ip_address=ip_address,
-        request_time=datetime.now(timezone.utc).isoformat(),
     )
 
     # Return success message (don't include token in response for security)

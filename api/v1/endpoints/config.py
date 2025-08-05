@@ -231,7 +231,7 @@ async def update_logo(
 
     # Delete previous Logo using the utility function
     if config.logo_url:
-        remove_file_if_exists(config.logo_url)
+        await remove_file_if_exists(config.logo_url)
 
     # Update and save
     config.logo_url = uploaded_logo_url

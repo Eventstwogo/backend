@@ -9,6 +9,7 @@ from db.sessions.database import get_db
 from schemas.vendor_management import RejectRequest, VendorActionRequest, VendorActionResponse, VendorStatusResponse
 from schemas.products import AllProductsListResponse, AllProductsResponse
 from utils.file_uploads import get_media_url
+from utils.id_generators import decrypt_data
 
 
 router = APIRouter()
@@ -197,10 +198,23 @@ async def get_vendor_status(
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
 
+    # Fetch business profile to get store name
+    profile_stmt = select(BusinessProfile).where(
+        BusinessProfile.profile_ref_id == vendor.business_profile_id
+    )
+    profile_result = await db.execute(profile_stmt)
+    business_profile = profile_result.scalar_one_or_none()
+
+    # Get store name from business profile, fallback to username if not found
+    store_name = business_profile.store_name if business_profile else vendor.username
+
+    # Decrypt email before returning
+    decrypted_email = decrypt_data(vendor.email)
+
     return VendorStatusResponse(
         user_id=vendor.user_id,
-        username=vendor.username,
-        email=vendor.email,
+        username=store_name,
+        email=decrypted_email,
         is_active=vendor.is_active,
         is_verified=vendor.is_verified,
         last_login=vendor.last_login.isoformat() if vendor.last_login else None,

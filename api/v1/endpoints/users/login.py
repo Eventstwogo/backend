@@ -794,6 +794,7 @@ async def get_all_users(
                 last_name=decrypted_last_name,
                 email=decrypted_email,
                 phone_number=decrypted_phone,
+                is_active=user.is_active,
             )
             users_list.append(user_data)
             

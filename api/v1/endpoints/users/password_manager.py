@@ -100,7 +100,6 @@ async def forgot_password(
         reset_link=reset_link,
         expiry_minutes=60,  # 1 hour expiry
         ip_address=ip_address,
-        request_time=datetime.now(timezone.utc).isoformat(),
     )
 
     # Return success message (don't include token in response for security)
@@ -185,7 +184,7 @@ async def change_password(
     
     # Step 1: Get user by user_id
     from sqlalchemy import select
-    from db.models.superadmin import User
+    from db.models.general import User
     
     user_result = await db.execute(
         select(User).where(User.user_id == user_id)
