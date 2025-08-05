@@ -27,7 +27,7 @@ from services.user_password_reset import (
     account_not_verified,
 )
 from utils.auth import hash_password, verify_password
-from utils.email import send_user_password_reset_email
+from services.email_service import email_service
 from utils.email_validators import EmailValidator
 from utils.exception_handlers import exception_handler
 from utils.id_generators import decrypt_data
@@ -94,7 +94,7 @@ async def forgot_password(
     # Use the plain text email from the form input and decrypt the username
     decrypted_username = decrypt_data(user.username)
     
-    send_user_password_reset_email(
+    email_service.send_user_password_reset_email(
         email=email,  # Use plain text email from form
         username=decrypted_username,  # Decrypt the username
         reset_link=reset_link,

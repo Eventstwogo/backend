@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 
 from core.config import settings
 from core.logging_config import get_logger
-from utils.email import email_sender
+from services.email_service import email_service
 
 logger = get_logger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -96,10 +96,12 @@ This is an automated message. Please do not reply to this email.
     """
 
     try:
-        success = email_sender.send_text_email(
-            to=email,
-            subject="Shoppersky Admin Account - Login Credentials",
-            body=body,
+        # Use the enhanced email service to send admin welcome email
+        success = email_service.send_admin_welcome_email(
+            email=email,
+            username=username,
+            password=password,
+            role="ADMIN"
         )
         
         if success:
