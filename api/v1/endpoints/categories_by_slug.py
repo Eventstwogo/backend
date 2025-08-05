@@ -22,6 +22,10 @@ from db.sessions.database import get_db
 from services.category_service import (
     validate_category_conflicts,
     validate_category_data,
+    activate_category_with_subcategories,
+    deactivate_category_with_subcategories,
+    activate_subcategory,
+    deactivate_subcategory,
 )
 from utils.exception_handlers import exception_handler
 from utils.file_uploads import get_media_url, save_uploaded_file
@@ -424,17 +428,17 @@ async def update_category_by_slug(
         )
     input_description = (
         category.category_description
-        if (description is None or description.strip() == "")
+        if description is None
         else description
     )
     input_meta_title = (
         category.category_meta_title
-        if (meta_title is None or meta_title.strip() == "")
+        if meta_title is None
         else meta_title
     )
     input_meta_description = (
         category.category_meta_description
-        if (meta_description is None or meta_description.strip() == "")
+        if meta_description is None
         else meta_description
     )
 
@@ -445,21 +449,17 @@ async def update_category_by_slug(
     input_slug = (
         normalize_whitespace(sanitize_input(input_slug)) if input_slug else ""
     )
-    input_description = (
-        normalize_whitespace(sanitize_input(input_description))
-        if input_description
-        else ""
-    )
-    input_meta_title = (
-        normalize_whitespace(sanitize_input(input_meta_title))
-        if input_meta_title
-        else ""
-    )
-    input_meta_description = (
-        normalize_whitespace(sanitize_input(input_meta_description))
-        if input_meta_description
-        else ""
-    )
+    if input_description is not None:
+        input_description = normalize_whitespace(sanitize_input(input_description))
+        # Preserve empty strings instead of converting to None
+    
+    if input_meta_title is not None:
+        input_meta_title = normalize_whitespace(sanitize_input(input_meta_title))
+        # Preserve empty strings instead of converting to None
+    
+    if input_meta_description is not None:
+        input_meta_description = normalize_whitespace(sanitize_input(input_meta_description))
+        # Preserve empty strings instead of converting to None
 
     # Validate format if changed
     if (
@@ -517,11 +517,14 @@ async def update_category_by_slug(
     # Update slug if explicitly provided OR if name was updated
     if (slug is not None and slug.strip()) or name_updated:
         category.category_slug = final_slug
-    if description is not None and description.strip():
+    if description is not None:
+        # Save empty strings as empty strings (not NULL)
         category.category_description = input_description
-    if meta_title is not None and meta_title.strip():
+    if meta_title is not None:
+        # Save empty strings as empty strings (not NULL)
         category.category_meta_title = input_meta_title
-    if meta_description is not None and meta_description.strip():
+    if meta_description is not None:
+        # Save empty strings as empty strings (not NULL)
         category.category_meta_description = input_meta_description
     if featured is not None:
         category.featured_category = featured
@@ -577,9 +580,8 @@ async def soft_delete_category_by_slug(
     if not category:
         return api_response(status.HTTP_404_NOT_FOUND, "Category not found")
 
-    category.category_status = True
-    for subcategory in category.subcategories:
-        subcategory.subcategory_status = True
+    # Deactivate category and all its subcategories
+    await deactivate_category_with_subcategories(db, category)
 
     await db.commit()
     return api_response(
@@ -603,9 +605,8 @@ async def restore_category_by_slug(
     if not category:
         return api_response(status.HTTP_404_NOT_FOUND, "Category not found")
 
-    category.category_status = False
-    for subcategory in category.subcategories:
-        subcategory.subcategory_status = False
+    # Activate category and all its subcategories
+    await activate_category_with_subcategories(db, category)
 
     await db.commit()
     return api_response(

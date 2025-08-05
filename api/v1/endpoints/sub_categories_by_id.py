@@ -22,6 +22,8 @@ from services.category_service import (
     check_subcategory_conflicts,
     check_subcategory_vs_category_conflicts,
     validate_subcategory_fields,
+    activate_subcategory,
+    deactivate_subcategory,
 )
 from utils.exception_handlers import exception_handler
 from utils.file_uploads import get_media_url, save_uploaded_file
@@ -140,17 +142,17 @@ async def update_subcategory(
         )
     input_description = (
         subcategory.subcategory_description
-        if (description is None or description.strip() == "")
+        if description is None
         else description
     )
     input_meta_title = (
         subcategory.subcategory_meta_title
-        if (meta_title is None or meta_title.strip() == "")
+        if meta_title is None
         else meta_title
     )
     input_meta_description = (
         subcategory.subcategory_meta_description
-        if (meta_description is None or meta_description.strip() == "")
+        if meta_description is None
         else meta_description
     )
 
@@ -201,11 +203,14 @@ async def update_subcategory(
     # Update slug if explicitly provided OR if name was updated
     if (slug is not None and slug.strip()) or name_updated:
         subcategory.subcategory_slug = final_slug
-    if description is not None and description.strip():
+    if description is not None:
+        # Save empty strings as empty strings (not NULL)
         subcategory.subcategory_description = input_description
-    if meta_title is not None and meta_title.strip():
+    if meta_title is not None:
+        # Save empty strings as empty strings (not NULL)
         subcategory.subcategory_meta_title = input_meta_title
-    if meta_description is not None and meta_description.strip():
+    if meta_description is not None:
+        # Save empty strings as empty strings (not NULL)
         subcategory.subcategory_meta_description = input_meta_description
     if featured is not None:
         subcategory.featured_subcategory = featured
@@ -225,8 +230,9 @@ async def update_subcategory(
         uploaded_url = await save_uploaded_file(file, sub_path)
         subcategory.subcategory_img_thumbnail = uploaded_url
 
-        await db.commit()
-        await db.refresh(subcategory)
+    # === Commit changes to database ===
+    await db.commit()
+    await db.refresh(subcategory)
 
     return api_response(
         status.HTTP_200_OK,
@@ -253,7 +259,8 @@ async def soft_delete_subcategory(
             status.HTTP_400_BAD_REQUEST, "Subcategory already inactive"
         )
 
-    subcategory.subcategory_status = True
+    # Deactivate the subcategory
+    await deactivate_subcategory(db, subcategory)
     await db.commit()
 
     return api_response(
@@ -279,7 +286,8 @@ async def restore_subcategory(
             status.HTTP_400_BAD_REQUEST, "Subcategory is already active"
         )
 
-    subcategory.subcategory_status = False
+    # Activate the subcategory (with parent category validation)
+    await activate_subcategory(db, subcategory)
     await db.commit()
 
     return api_response(status.HTTP_200_OK, "Subcategory restored successfully")

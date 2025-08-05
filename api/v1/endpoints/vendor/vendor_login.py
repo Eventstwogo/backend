@@ -100,7 +100,13 @@ async def login_user(
     profile_result = await db.execute(profile_stmt)
     profile_data = profile_result.one_or_none()
 
-    is_approved, ref_number, industry, store_slug, reviewer_comment = profile_data if profile_data else (-2, "", "", "","")
+    is_approved, ref_number, industry, store_slug, reviewer_comment = profile_data if profile_data else (-2, "", "", "", "")
+    
+    # Handle None values from database
+    ref_number = ref_number or ""
+    industry = industry or ""
+    store_slug = store_slug or ""
+    reviewer_comment = reviewer_comment or ""
 
 
     # Step 7: Determine onboarding_status

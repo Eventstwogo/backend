@@ -21,6 +21,8 @@ from db.sessions.database import get_db
 from services.category_service import (
     validate_category_conflicts,
     validate_category_data,
+    activate_category_with_subcategories,
+    deactivate_category_with_subcategories,
 )
 from utils.exception_handlers import exception_handler
 from utils.file_uploads import get_media_url, save_uploaded_file
@@ -155,17 +157,17 @@ async def update_category(
         )
     input_description = (
         category.category_description
-        if (description is None or description.strip() == "")
+        if description is None
         else description
     )
     input_meta_title = (
         category.category_meta_title
-        if (meta_title is None or meta_title.strip() == "")
+        if meta_title is None
         else meta_title
     )
     input_meta_description = (
         category.category_meta_description
-        if (meta_description is None or meta_description.strip() == "")
+        if meta_description is None
         else meta_description
     )
 
@@ -211,18 +213,21 @@ async def update_category(
         if conflict_error:
             return api_response(status.HTTP_400_BAD_REQUEST, conflict_error)
 
-    # === Apply updates (only if not empty strings) ===
+    # === Apply updates ===
     if name is not None and name.strip():
         assert input_name is not None
         category.category_name = input_name.upper()
     # Update slug if explicitly provided OR if name was updated
     if (slug is not None and slug.strip()) or name_updated:
         category.category_slug = final_slug
-    if description is not None and description.strip():
+    if description is not None:
+        # Save empty strings as empty strings (not NULL)
         category.category_description = input_description
-    if meta_title is not None and meta_title.strip():
+    if meta_title is not None:
+        # Save empty strings as empty strings (not NULL)
         category.category_meta_title = input_meta_title
-    if meta_description is not None and meta_description.strip():
+    if meta_description is not None:
+        # Save empty strings as empty strings (not NULL)
         category.category_meta_description = input_meta_description
 
     if featured is not None:
@@ -272,12 +277,8 @@ async def soft_delete_category(
             status.HTTP_400_BAD_REQUEST, "Category already inactive"
         )
 
-    # Soft-delete category
-    category.category_status = True
-
-    # Soft-delete all subcategories under it
-    # for sub in category.subcategories:
-    #     sub.subcategory_status = True
+    # Deactivate category and all its subcategories
+    await deactivate_category_with_subcategories(db, category)
 
     await db.commit()
 
@@ -308,12 +309,8 @@ async def restore_category(
             status.HTTP_400_BAD_REQUEST, "Category is already active"
         )
 
-    # Restore the category
-    category.category_status = False
-
-    # Restore all subcategories
-    # for sub in category.subcategories:
-    #     sub.subcategory_status = False
+    # Activate category and all its subcategories
+    await activate_category_with_subcategories(db, category)
 
     await db.commit()
 
