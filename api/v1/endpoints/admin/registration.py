@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 from passlib.context import CryptContext
-from services.email_service import EmailTemplateService
+from services.email_service import email_service
 from utils.validations import generate_random_password
 from core.api_response import api_response
 from db.models.superadmin import AdminUser, Config, Role
@@ -111,7 +111,6 @@ async def create_admin_user(
         await db.refresh(new_admin)
         
         # Send welcome email
-        email_service = EmailTemplateService()
         email_sent = False
         
         try:

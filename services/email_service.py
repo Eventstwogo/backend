@@ -8,22 +8,40 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from pydantic import EmailStr
 
-
 from core.config import settings
 from core.logging_config import get_logger
+from utils.enhanced_email import EmailSender, EmailConfig, create_email_sender_from_settings, EmailTemplates
 
 logger = get_logger(__name__)
 
 
 class EmailTemplateService:
-    """Enhanced email service with HTML template support using Jinja2"""
+    """Enhanced email service with HTML template support using the new EmailSender"""
     
     def __init__(self):
+        # Use the new enhanced email sender
+        try:
+            self.email_sender = create_email_sender_from_settings(settings)
+            logger.info("✅ Enhanced email service initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize enhanced email service: {e}")
+            # Fallback to legacy implementation
+            self._init_legacy()
+    
+    def _init_legacy(self):
+        """Fallback to legacy email implementation"""
         self.smtp_server = settings.SMTP_HOST
         self.smtp_port = settings.SMTP_PORT
         self.smtp_username = settings.SMTP_USER
-        self.smtp_password = settings.SMTP_PASSWORD
-        self.from_email = settings.EMAIL_FROM
+        
+        # Handle SecretStr password
+        password = settings.SMTP_PASSWORD
+        if hasattr(password, 'get_secret_value'):
+            self.smtp_password = password.get_secret_value()
+        else:
+            self.smtp_password = str(password)
+            
+        self.from_email = str(settings.EMAIL_FROM)
         self.from_name = settings.EMAIL_FROM_NAME
         
         # Setup Jinja2 environment for templates
@@ -32,6 +50,8 @@ class EmailTemplateService:
             loader=FileSystemLoader(str(template_dir)),
             autoescape=True
         )
+        self.email_sender = None
+        logger.warning("⚠️  Using legacy email implementation")
         
     def _get_smtp_connection(self) -> Optional[smtplib.SMTP]:
         """Create and return SMTP connection"""
@@ -67,6 +87,27 @@ class EmailTemplateService:
         plain_text: Optional[str] = None
     ) -> bool:
         """Send HTML email with optional plain text fallback"""
+        if self.email_sender:
+            # Use enhanced email sender
+            result = self.email_sender.send_email(
+                to_email=to_email,
+                subject=subject,
+                html_content=html_content,
+                text_content=plain_text
+            )
+            return result.success
+        else:
+            # Fallback to legacy implementation
+            return self._send_html_email_legacy(to_email, subject, html_content, plain_text)
+    
+    def _send_html_email_legacy(
+        self,
+        to_email: EmailStr,
+        subject: str,
+        html_content: str,
+        plain_text: Optional[str] = None
+    ) -> bool:
+        """Legacy HTML email sending implementation"""
         try:
             server = self._get_smtp_connection()
             if not server:
@@ -104,11 +145,22 @@ class EmailTemplateService:
         context: Dict[str, Any]
     ) -> bool:
         """Send email using HTML template"""
-        html_content = self._render_template(template_name, context)
-        if not html_content:
-            return False
-        
-        return self.send_html_email(to_email, subject, html_content)
+        if self.email_sender:
+            # Use enhanced email sender with template support
+            result = self.email_sender.send_template_email(
+                to_email=to_email,
+                subject=subject,
+                template_name=template_name,
+                context=context
+            )
+            return result.success
+        else:
+            # Fallback to legacy template rendering
+            html_content = self._render_template(template_name, context)
+            if not html_content:
+                return False
+            
+            return self.send_html_email(to_email, subject, html_content)
     
     def send_welcome_email(
         self,
@@ -559,22 +611,7 @@ def send_user_password_reset_email(
     )
 
 
-# Example usage functions
-def send_test_email(to_email: EmailStr) -> bool:
-    """Send a test email to verify email configuration"""
-    context = {
-        'username': 'Test User',
-        'email': to_email,
-        'password': 'TestPassword123',
-        'login_url': settings.FRONTEND_URL
-    }
-    
-    return email_service.send_template_email(
-        to_email=to_email,
-        subject="Test Email - Shoppersky Configuration",
-        template_name="welcome_email.html",
-        context=context
-    )
+
 
 
 def send_notification_email(
@@ -618,3 +655,5 @@ def send_notification_email(
     """
     
     return email_service.send_html_email(to_email, title, html_content)
+
+

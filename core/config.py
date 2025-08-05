@@ -9,10 +9,10 @@ logger: Logger = logging.getLogger(__name__)
 import json
 import os
 from functools import lru_cache
-from typing import List, Literal
+from typing import List, Literal, Dict, Any
 
 from dotenv import load_dotenv
-from pydantic import SecretBytes
+from pydantic import SecretBytes, SecretStr, EmailStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from core.secrets_dependencies import fetch_secrets_from_vault
 from keys.key_manager import KeyManager
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     POSTGRES_DRIVER: str = "asyncpg"
     POSTGRES_SCHEME: str = "postgresql"
     POSTGRES_HOST: str = "192.168.0.207"  # Will be set by Vault
-    POSTGRES_PORT: int = 5433  # Will be set by Vault
+    POSTGRES_PORT: int = 5432  # Will be set by Vault
     POSTGRES_USER: str = "postgres"  # Will be set by Vault
     POSTGRES_PASSWORD: str = "postgres"  # Will be set by Vault
     POSTGRES_DB: str = "shoppersky"  # Will be set by Vault
@@ -95,26 +95,83 @@ class Settings(BaseSettings):
     CONFIG_LOGO_PATH: str = "config/logo/"
     PROFILE_PICTURE_UPLOAD_PATH: str = "users/profile_pictures/{username}_avatar"
 
-    # === Email ===
+    # === Email Configuration ===
+    # SMTP Connection Settings
     SMTP_TLS: bool = True
+    SMTP_SSL: bool = False  # Set to True for port 465
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_USER: str = os.getenv("SMTP_USER", "your-email@gmail.com")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "your-smtp-password")
+    SMTP_PASSWORD: SecretStr = SecretStr(os.getenv("SMTP_PASSWORD", "your-smtp-password"))
+    
+    # Email Identity Settings
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "your-email@gmail.com")
-    EMAIL_FROM_NAME: str = os.getenv("EMAIL_FROM_NAME", "Shoppersky API")
+    EMAIL_FROM_NAME: str = os.getenv("EMAIL_FROM_NAME", "Shoppersky Team")
+    SUPPORT_EMAIL: str = os.getenv("SUPPORT_EMAIL", "support@shoppersky.com")
+    
+    # Email Template Settings
     EMAIL_TEMPLATES_DIR: str = "templates"
-    SUPPORT_EMAIL: str = "support@shoppersky.com"
+    EMAIL_TIMEOUT: int = 30  # SMTP timeout in seconds
+    EMAIL_MAX_RETRIES: int = 3  # Maximum retry attempts for failed emails
+    
+    # Email Provider Presets (for easy switching)
+    EMAIL_PROVIDER: Literal["gmail", "sendgrid", "brevo", "ses", "custom"] = "gmail"
+    
+    @property
+    def EMAIL_CONFIG(self) -> Dict[str, Any]:
+        """Get email configuration based on provider"""
+        provider_configs = {
+            "gmail": {
+                "SMTP_HOST": "smtp.gmail.com",
+                "SMTP_PORT": 587,
+                "SMTP_TLS": True,
+                "SMTP_SSL": False
+            },
+            "sendgrid": {
+                "SMTP_HOST": "smtp.sendgrid.net", 
+                "SMTP_PORT": 587,
+                "SMTP_TLS": True,
+                "SMTP_SSL": False
+            },
+            "brevo": {
+                "SMTP_HOST": "smtp-relay.brevo.com",
+                "SMTP_PORT": 587,
+                "SMTP_TLS": True,
+                "SMTP_SSL": False
+            },
+            "ses": {
+                "SMTP_HOST": "email-smtp.us-east-1.amazonaws.com",  # Default region
+                "SMTP_PORT": 587,
+                "SMTP_TLS": True,
+                "SMTP_SSL": False
+            },
+            "custom": {
+                "SMTP_HOST": self.SMTP_HOST,
+                "SMTP_PORT": self.SMTP_PORT,
+                "SMTP_TLS": self.SMTP_TLS,
+                "SMTP_SSL": self.SMTP_SSL
+            }
+        }
+        
+        config = provider_configs.get(self.EMAIL_PROVIDER, provider_configs["custom"])
+        return {
+            **config,
+            "SMTP_USER": self.SMTP_USER,
+            "SMTP_PASSWORD": self.SMTP_PASSWORD.get_secret_value() if isinstance(self.SMTP_PASSWORD, SecretStr) else self.SMTP_PASSWORD,
+            "EMAIL_FROM": str(self.EMAIL_FROM),
+            "EMAIL_FROM_NAME": self.EMAIL_FROM_NAME,
+            "SUPPORT_EMAIL": str(self.SUPPORT_EMAIL),
+            "EMAIL_TIMEOUT": self.EMAIL_TIMEOUT,
+            "EMAIL_MAX_RETRIES": self.EMAIL_MAX_RETRIES
+        }
 
     # === JWT ===
     JWT_ALGORITHM: str = "RS256"
     JWT_ACCESS_TOKEN_EXPIRE_SECONDS: int = 3600
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     JWT_KEYS_DIR: str = "keys"
-    JWT_ISSUER: str = "e2g-api"
-    JWT_AUDIENCE: str = "e2g-admin"
-
-    FERNET_KEY: str = ""
+    JWT_ISSUER: str = "shoppersky-api"
+    JWT_AUDIENCE: str = "shoppersky-admin"
 
     # === DigitalOcean Spaces ===
     SPACES_REGION_NAME: str = "syd1"
@@ -136,34 +193,61 @@ class Settings(BaseSettings):
     )
 
     async def load_vault_secrets(self):
-        global vault_url, vault_token, secret_path
-        vault_url = self.VAULT_URL
-        vault_token = self.VAULT_TOKEN
-        secret_path = self.VAULT_SECRET_PATH
-        logger.info(f"Fetching secrets from Vault: {vault_url}/{secret_path}")
-        secrets = await fetch_secrets_from_vault()
-        logger.info(f"Raw secrets from Vault: {secrets}")
-        self.POSTGRES_DB = secrets.get("SOURCE_DB_NAME", self.POSTGRES_DB)
-        self.POSTGRES_HOST = secrets.get("DB_HOST", self.POSTGRES_HOST)
-        self.POSTGRES_PASSWORD = secrets.get("DB_PASSWORD", self.POSTGRES_PASSWORD)
-        self.POSTGRES_PORT = int(secrets.get("DB_PORT", self.POSTGRES_PORT))
-        self.POSTGRES_USER = secrets.get("DB_USER", self.POSTGRES_USER)
-        if not self.POSTGRES_USER:
-            self.POSTGRES_USER = secrets.get("DATABASE", self.POSTGRES_USER)
-        if not all([self.POSTGRES_USER, self.POSTGRES_PASSWORD, self.POSTGRES_HOST, self.POSTGRES_DB]):
-            raise ValueError(f"Missing database credentials after Vault fetch: user={self.POSTGRES_USER}, host={self.POSTGRES_HOST}, port={self.POSTGRES_PORT}, db={self.POSTGRES_DB}, secrets={secrets}")
-        self.SMTP_PORT = int(secrets.get("SMTP_PORT", self.SMTP_PORT))
-        self.SMTP_HOST = secrets.get("SMTP_SERVER", self.SMTP_HOST)
-        self.SMTP_USER = secrets.get("SMTP_LOGIN", self.SMTP_USER)
-        self.SMTP_PASSWORD = secrets.get("SENDER_PASSWORD", self.SMTP_PASSWORD)
-        self.EMAIL_FROM = secrets.get("SENDER_EMAIL", self.EMAIL_FROM)
-        self.SPACES_REGION_NAME = secrets.get("SPACES_REGION_NAME", self.SPACES_REGION_NAME)
-        self.SPACES_BUCKET_NAME = secrets.get("SPACES_BUCKET_NAME", self.SPACES_BUCKET_NAME)
-        self.SPACES_ACCESS_KEY_ID = secrets.get("SPACES_ACCESS_KEY", self.SPACES_ACCESS_KEY_ID)
-        self.SPACES_SECRET_ACCESS_KEY = secrets.get("SPACES_SECRET_KEY", self.SPACES_SECRET_ACCESS_KEY)
-        self.FERNET_KEY = secrets.get("FERNET_KEY", self.FERNET_KEY)
-        print(self.FERNET_KEY)
-        logger.info(f"Updated database settings: user={self.POSTGRES_USER}, host={self.POSTGRES_HOST}, port={self.POSTGRES_PORT}, db={self.POSTGRES_DB}")
+        """Load secrets from Vault using the new secrets management system"""
+        try:
+            from core.secrets import get_secrets_manager
+            
+            secrets_manager = get_secrets_manager()
+            secrets = await secrets_manager.fetch_secrets()
+            
+            logger.info(f"🔐 Loading secrets from {'Vault' if secrets_manager.is_vault_available else 'environment variables'}")
+            
+            # Update database settings
+            self.POSTGRES_DB = secrets.get("POSTGRES_DB", self.POSTGRES_DB)
+            self.POSTGRES_HOST = secrets.get("POSTGRES_HOST", self.POSTGRES_HOST)
+            self.POSTGRES_PASSWORD = secrets.get("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD)
+            self.POSTGRES_PORT = int(secrets.get("POSTGRES_PORT", self.POSTGRES_PORT))
+            self.POSTGRES_USER = secrets.get("POSTGRES_USER", self.POSTGRES_USER)
+            
+            # Validate database credentials
+            if not all([self.POSTGRES_USER, self.POSTGRES_PASSWORD, self.POSTGRES_HOST, self.POSTGRES_DB]):
+                raise ValueError(f"Missing database credentials: user={bool(self.POSTGRES_USER)}, password={bool(self.POSTGRES_PASSWORD)}, host={bool(self.POSTGRES_HOST)}, db={bool(self.POSTGRES_DB)}")
+            
+            # Update email settings with proper type handling
+            self.SMTP_PORT = int(secrets.get("SMTP_PORT", self.SMTP_PORT))
+            self.SMTP_HOST = secrets.get("SMTP_HOST", self.SMTP_HOST)
+            self.SMTP_USER = secrets.get("SMTP_USER", self.SMTP_USER)
+            
+            # Handle SecretStr for password
+            smtp_password = secrets.get("SMTP_PASSWORD", self.SMTP_PASSWORD)
+            if isinstance(smtp_password, str):
+                self.SMTP_PASSWORD = SecretStr(smtp_password)
+            elif not isinstance(self.SMTP_PASSWORD, SecretStr):
+                self.SMTP_PASSWORD = SecretStr(str(self.SMTP_PASSWORD))
+            
+            # Update email addresses
+            email_from = secrets.get("EMAIL_FROM", self.EMAIL_FROM)
+            if isinstance(email_from, str) and email_from:
+                self.EMAIL_FROM = email_from
+                
+            support_email = secrets.get("SUPPORT_EMAIL", self.SUPPORT_EMAIL)
+            if isinstance(support_email, str) and support_email:
+                self.SUPPORT_EMAIL = support_email
+                
+            self.EMAIL_FROM_NAME = secrets.get("EMAIL_FROM_NAME", self.EMAIL_FROM_NAME)
+            
+            # Update DigitalOcean Spaces settings
+            self.SPACES_REGION_NAME = secrets.get("SPACES_REGION_NAME", self.SPACES_REGION_NAME)
+            self.SPACES_BUCKET_NAME = secrets.get("SPACES_BUCKET_NAME", self.SPACES_BUCKET_NAME)
+            self.SPACES_ACCESS_KEY_ID = secrets.get("SPACES_ACCESS_KEY_ID", self.SPACES_ACCESS_KEY_ID)
+            self.SPACES_SECRET_ACCESS_KEY = secrets.get("SPACES_SECRET_ACCESS_KEY", self.SPACES_SECRET_ACCESS_KEY)
+            
+            logger.info(f"✅ Configuration updated - DB: {self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}, Email: {self.SMTP_HOST}:{self.SMTP_PORT}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to load secrets: {e}")
+            # Continue with existing configuration from environment variables
+            logger.warning("⚠️  Continuing with environment variable configuration")
 
 @lru_cache()
 def get_settings() -> Settings:
