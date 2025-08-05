@@ -520,6 +520,11 @@ class BasicUserResponse(BaseModel):
         title="Phone Number",
         description="User's phone number.",
     )
+    is_active: bool = Field(
+        ...,
+        title="Is Active",
+        description="Whether the user account is active.",
+    )
 
 
 class UserDetailResponse(BaseModel):
