@@ -120,6 +120,15 @@ async def create_product(
         if not product_name:
             return APIResponse.response(StatusCode.BAD_REQUEST, "Product name is required", log_error=True)
 
+        # Validate that at least one image is provided
+        if not files or len(files) == 0:
+            return APIResponse.response(StatusCode.BAD_REQUEST, "At least one product image is required", log_error=True)
+        
+        # Check if any file has content
+        valid_files = [f for f in files if f and f.filename]
+        if not valid_files:
+            return APIResponse.response(StatusCode.BAD_REQUEST, "At least one valid product image is required", log_error=True)
+
         # Generate unique slug
         base_slug = slugify(product_name)
         slug = base_slug
@@ -136,12 +145,10 @@ async def create_product(
 
         # Save uploaded images
         image_urls = []
-        if files:
-            for file in files:
-                sub_path = f"products/{cat_id}/{slug}"
-                uploaded_url = await save_uploaded_file(file, sub_path)
-                if uploaded_url:
-                    image_urls.append(uploaded_url)
+        for file in valid_files:
+            sub_path = f"products/{cat_id}/{slug}"
+            uploaded_url = await save_uploaded_file(file, sub_path)
+            image_urls.append(uploaded_url)
 
         # Create product
         db_product = Product(
@@ -170,7 +177,7 @@ async def create_product(
                 "dimensions": physical_attributes_data.get("dimensions", {}),
                 "shipping_class": physical_attributes_data.get("shipping_class", "standard")
             } if physical_attributes_data else None,
-            images={"urls": image_urls} if image_urls else None,
+            images={"urls": image_urls},
             tags_and_relationships={
                 "product_tags": tags_and_relationships_data.get("product_tags", []),
                 "linkedproductid": tags_and_relationships_data.get("linkedproductid", "")

@@ -54,7 +54,7 @@ async def create_category_or_subcategory(
     meta_description: Optional[str] = Form(None),
     featured: bool = Form(False),
     show_in_menu: bool = Form(True),
-    file: UploadFile = File(None),
+    file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     is_subcategory = bool(category_id)
@@ -154,8 +154,7 @@ async def create_category_or_subcategory(
 
         sub_path = f"subcategories/{category_id}/{final_slug}"
         uploaded_url = await save_uploaded_file(file, sub_path)
-        if uploaded_url:
-            new_subcategory.subcategory_img_thumbnail = uploaded_url
+        new_subcategory.subcategory_img_thumbnail = uploaded_url
 
         db.add(new_subcategory)
         await db.commit()
@@ -191,8 +190,7 @@ async def create_category_or_subcategory(
 
     cat_path = f"categories/{final_slug}"
     uploaded_url = await save_uploaded_file(file, cat_path)
-    if uploaded_url:
-        new_category.category_img_thumbnail = uploaded_url
+    new_category.category_img_thumbnail = uploaded_url
 
     db.add(new_category)
     await db.commit()

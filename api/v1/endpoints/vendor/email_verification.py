@@ -71,6 +71,7 @@ async def copy_data(db: AsyncSession, user_email: str, encrypted_email: str):
             business_profile_id=business_profile_id,
             user_profile_id=user_profile_id,
             role=role_id,
+            login_status=0,  # 0 for regular vendors (default)
         )
 
         db.add(new_user_login)

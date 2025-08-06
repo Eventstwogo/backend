@@ -160,7 +160,7 @@ async def create_vendor_employee(
         is_active=False,  # False means active
         login_attempts=0,
         login_failed_attempts=0,
-        login_status=0,
+        login_status=-1,  # -1 means initial password for employee
         timestamp=datetime.utcnow()
     )
 
@@ -265,7 +265,8 @@ async def get_vendor_employee_by_id(
             "email": decrypted_email,
             "role_id": employee.role,
             "role_name": role_name,
-            "vendor_ref_id": employee.vendor_ref_id
+            "vendor_ref_id": employee.vendor_ref_id,
+            "is_active": employee.is_active
         }
     )
 
@@ -573,7 +574,8 @@ async def get_all_vendor_employees(
             "email": decrypted_email,
             "role_id": employee.role,
             "role_name": role_name,
-            "vendor_ref_id": employee.vendor_ref_id
+            "vendor_ref_id": employee.vendor_ref_id,
+            "is_active": employee.is_active
         })
    
     return api_response(

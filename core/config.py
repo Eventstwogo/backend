@@ -209,7 +209,7 @@ class Settings(BaseSettings):
         )
 
     @property
-    def SPACES_PUBLIC_URL(self) -> str:
+    def spaces_public_url(self) -> str:
         return (
             f"{self.SPACES_ENDPOINT_URL.rstrip('/')}/{self.SPACES_BUCKET_NAME}"
         )
