@@ -189,6 +189,10 @@ async def check_category_slug_exists(db: AsyncSession, slug: str) -> bool:
 async def check_category_description_exists(
     db: AsyncSession, description: str
 ) -> bool:
+    # Skip validation if description is None or empty
+    if not description or not description.strip():
+        return False
+        
     result = await db.execute(
         select(Category).where(
             func.lower(Category.category_description)
@@ -206,6 +210,10 @@ async def check_category_description_exists(
 async def check_category_meta_title_exists(
     db: AsyncSession, meta_title: str
 ) -> bool:
+    # Skip validation if meta_title is None or empty
+    if not meta_title or not meta_title.strip():
+        return False
+        
     result = await db.execute(
         select(Category).where(
             func.lower(Category.category_meta_title)
@@ -223,6 +231,10 @@ async def check_category_meta_title_exists(
 async def check_category_meta_description_exists(
     db: AsyncSession, meta_description: str
 ) -> bool:
+    # Skip validation if meta_description is None or empty
+    if not meta_description or not meta_description.strip():
+        return False
+        
     result = await db.execute(
         select(Category).where(
             func.lower(Category.category_meta_description)
@@ -272,6 +284,10 @@ async def check_subcategory_slug_exists(db: AsyncSession, slug: str) -> bool:
 async def check_subcategory_description_exists(
     db: AsyncSession, description: str
 ) -> bool:
+    # Skip validation if description is None or empty
+    if not description or not description.strip():
+        return False
+        
     result = await db.execute(
         select(SubCategory).where(
             func.lower(SubCategory.subcategory_description)
@@ -289,6 +305,10 @@ async def check_subcategory_description_exists(
 async def check_subcategory_meta_title_exists(
     db: AsyncSession, meta_title: str
 ) -> bool:
+    # Skip validation if meta_title is None or empty
+    if not meta_title or not meta_title.strip():
+        return False
+        
     result = await db.execute(
         select(SubCategory).where(
             func.lower(SubCategory.subcategory_meta_title)
@@ -306,6 +326,10 @@ async def check_subcategory_meta_title_exists(
 async def check_subcategory_meta_description_exists(
     db: AsyncSession, meta_description: str
 ) -> bool:
+    # Skip validation if meta_description is None or empty
+    if not meta_description or not meta_description.strip():
+        return False
+        
     result = await db.execute(
         select(SubCategory).where(
             func.lower(SubCategory.subcategory_meta_description)

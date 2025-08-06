@@ -67,8 +67,7 @@ def send_user_verification_email(
         bool: True if email was sent successfully, False otherwise
     """
     verification_link = (
-        f"{settings.USERS_APPLICATION_FRONTEND_URL}/verify-email?email={email}"
-        f"&token={verification_token}"
+        f"{settings.USERS_APPLICATION_FRONTEND_URL}/verify-email/{verification_token}?email={email}"
     )
 
     context = {
