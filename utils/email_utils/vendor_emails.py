@@ -78,7 +78,7 @@ def send_vendor_verification_email(
         bool: True if email was sent successfully, False otherwise
     """
     verification_link = (
-        f"{settings.VENDOR_FRONTEND_URL}/verify-email?email={email}"
+        f"{settings.VENDOR_FRONTEND_URL}/emailconfirmation?email={email}"
         f"&token={verification_token}"
     )
 
@@ -104,6 +104,51 @@ def send_vendor_verification_email(
 
     return success
 
+
+def resend_vendor_verification_email(
+    email: EmailStr,
+    business_name: str,
+    verification_token: str,
+    expires_in_minutes: int = 60,
+) -> bool:
+    """
+    Send a verification email to a vendor.
+
+    Args:
+        email: Vendor's email address
+        business_name: Vendor's business name
+        verification_token: Email verification token
+        expires_in_minutes: Token expiry time in minutes
+
+    Returns:
+        bool: True if email was sent successfully, False otherwise
+    """
+    verification_link = (
+        f"{settings.VENDOR_FRONTEND_URL}/emailresend?email={email}"
+        f"&token={verification_token}"
+    )
+
+    context = {
+        "business_name": business_name,
+        "email": email,
+        "verification_link": verification_link,
+        "vendor_portal_url": settings.VENDOR_FRONTEND_URL,
+        "current_year": str(datetime.now(tz=timezone.utc).year),
+        "expires_in_minutes": expires_in_minutes,
+        "support_email": settings.SUPPORT_EMAIL,
+    }
+
+    success = email_sender.send_email(
+        to=email,
+        subject="Verify Your Shoppersky Vendor Account",
+        template_file="vendor_verification_email.html",
+        context=context,
+    )
+
+    if not success:
+        logger.warning("Failed to send vendor verification email to %s", email)
+
+    return success
 
 def send_vendor_password_reset_email(
     email: EmailStr,

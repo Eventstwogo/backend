@@ -24,6 +24,7 @@ from db.sessions.database import get_db
 from schemas.categories import CategoryOut, MenuCategoryOut, MenuSubCategoryOut
 from services.category_service import (
     check_category_description_exists,
+    check_category_meta_description_exists,
     check_category_meta_title_exists,
     check_category_name_exists,
     check_category_slug_exists,
@@ -75,6 +76,7 @@ async def create_category_or_subcategory(
     await check_category_slug_exists(db, slug)
     await check_category_description_exists(db, description)
     await check_category_meta_title_exists(db, meta_title)
+    await check_category_meta_description_exists(db, meta_description)
 
 
 

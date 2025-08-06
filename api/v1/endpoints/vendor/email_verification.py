@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.vendor_onboarding import ResendVerificationRequest
 from utils.email_utils import send_vendor_verification_email
 from db.models.superadmin import VendorLogin, VendorSignup, Role
+from utils.email_utils.vendor_emails import resend_vendor_verification_email
 from utils.id_generators import  hash_data, generate_digits_letters, generate_digits_lowercase, generate_digits_uppercase, random_token
 from utils.exception_handlers import exception_handler
 from fastapi import APIRouter, Depends, status, BackgroundTasks
@@ -257,7 +258,7 @@ async def resend_verification_email(
    
     # Send verification email in background
     background_tasks.add_task(
-        send_vendor_verification_email,
+        resend_vendor_verification_email,
         email=request.email,
         business_name="Your Business",
         verification_token=new_email_token,
