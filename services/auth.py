@@ -52,7 +52,7 @@ async def check_account_lock(
 async def check_password(
     user: AdminUser, password: str, db: AsyncSession
 ) -> JSONResponse | None:
-    if not verify_password(password, user.password_hash):
+    if not verify_password(password, user.password):
         user.login_attempts += 1
         if user.login_attempts >= 3:
             user.login_status = 1

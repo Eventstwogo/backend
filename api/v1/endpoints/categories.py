@@ -71,10 +71,10 @@ async def create_category_or_subcategory(
         )
     )
 
-    check_category_name_exists(db, name)
-    check_category_slug_exists(db, slug)
-    check_category_description_exists(db, description)
-    check_category_meta_title_exists(db, meta_title)
+    await check_category_name_exists(db, name)
+    await check_category_slug_exists(db, slug)
+    await check_category_description_exists(db, description)
+    await check_category_meta_title_exists(db, meta_title)
 
 
 

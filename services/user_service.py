@@ -169,8 +169,8 @@ def decrypt_user_data(user: User, original_username: str = None, original_email:
     return {
         "user_id": user.user_id,
         "username": original_username,  # Username hash is one-way, need original
-        "first_name": decrypt_data(user.first_name_hash),
-        "last_name": decrypt_data(user.last_name_hash),
+        "first_name": decrypt_data(user.first_name),
+        "last_name": decrypt_data(user.last_name),
         "email": original_email,  # Email hash is one-way, need original
         "phone_number": original_phone,  # Phone hash is one-way, need original
         "login_status": user.login_status,

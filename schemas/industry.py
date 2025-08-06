@@ -124,7 +124,7 @@ class IndustryDetails(BaseModel):
     timestamp: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class VendorCategoryRequest(BaseModel):

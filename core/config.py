@@ -1,41 +1,113 @@
-
-import logging
-from logging import Logger
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger: Logger = logging.getLogger(__name__)
-
 import json
 import os
 from functools import lru_cache
-from typing import List, Literal, Dict, Any
+from typing import Any, Dict, List, Literal, Tuple, Type
 
 from dotenv import load_dotenv
-from pydantic import SecretBytes, SecretStr, EmailStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from core.secrets_dependencies import fetch_secrets_from_vault
+from pydantic import SecretBytes
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
+
+from core.secrets import fetch_vault_secrets_sync
 from keys.key_manager import KeyManager
 
-# # Remove environment variable override for database settings
-# os.environ.pop("ENVIRONMENT", None)  # Prevent override
+# # Development only
+# os.environ.pop("ENVIRONMENT", None)
 # load_dotenv(dotenv_path=".env.local", override=True)
+
+
+class VaultSettingsSource(PydanticBaseSettingsSource):
+    """
+    A custom Pydantic settings source that loads values from Vault.
+    Maps Vault keys to app settings keys.
+    """
+
+    def __init__(self, settings_cls: Type[BaseSettings]) -> None:
+        super().__init__(settings_cls)
+        self._vault_data = None
+
+    def _get_vault_data(self) -> Dict[str, Any]:
+        """Lazy load vault data to avoid multiple calls."""
+        if self._vault_data is None:
+            self._vault_data = fetch_vault_secrets_sync()
+        return self._vault_data
+
+    def get_field_value(
+        self, field: Any, field_name: str
+    ) -> Tuple[Any, str, bool]:
+        """
+        Get field value from Vault data.
+        Returns: (value, key, is_complex)
+        """
+        vault_data = self._get_vault_data()
+
+        # Map field names to vault keys
+        vault_key_mapping = {
+            "POSTGRES_USER": "DATABASE",
+            "POSTGRES_HOST": "DB_HOST",
+            "POSTGRES_PASSWORD": "DB_PASSWORD",
+            "POSTGRES_PORT": "DB_PORT",
+            "POSTGRES_DB": "SOURCE_DB_NAME",
+            "EMAIL_FROM": "SENDER_EMAIL",
+            "SMTP_PASSWORD": "SENDER_PASSWORD",
+            "SMTP_USER": "SMTP_LOGIN",
+            "SMTP_PORT": "SMTP_PORT",
+            "SMTP_HOST": "SMTP_SERVER",
+            "SPACES_ACCESS_KEY_ID": "SPACES_ACCESS_KEY",
+            "SPACES_BUCKET_NAME": "SPACES_BUCKET_NAME",
+            "SPACES_REGION_NAME": "SPACES_REGION_NAME",
+            "SPACES_SECRET_ACCESS_KEY": "SPACES_SECRET_KEY",
+            "FERNET_KEY": "FERNET_KEY",
+        }
+
+        vault_key = vault_key_mapping.get(field_name)
+        if vault_key and vault_key in vault_data:
+            value = vault_data[vault_key]
+            return value, field_name, False
+
+        # Return None if field not found in vault
+        return None, field_name, False
+
+    def __call__(self) -> Dict[str, Any]:
+        """Legacy method for backward compatibility."""
+        vault_data = self._get_vault_data()
+
+        return {
+            "POSTGRES_USER": vault_data.get("DATABASE"),
+            "POSTGRES_HOST": vault_data.get("DB_HOST"),
+            "POSTGRES_PASSWORD": vault_data.get("DB_PASSWORD"),
+            "POSTGRES_PORT": vault_data.get("DB_PORT"),
+            "POSTGRES_DB": vault_data.get("SOURCE_DB_NAME"),
+            "EMAIL_FROM": vault_data.get("SENDER_EMAIL"),
+            "SMTP_PASSWORD": vault_data.get("SENDER_PASSWORD"),
+            "SMTP_USER": vault_data.get("SMTP_LOGIN"),
+            "SMTP_PORT": vault_data.get("SMTP_PORT"),
+            "SMTP_HOST": vault_data.get("SMTP_SERVER"),
+            "SPACES_ACCESS_KEY_ID": vault_data.get("SPACES_ACCESS_KEY"),
+            "SPACES_BUCKET_NAME": vault_data.get("SPACES_BUCKET_NAME"),
+            "SPACES_REGION_NAME": vault_data.get("SPACES_REGION_NAME"),
+            "SPACES_SECRET_ACCESS_KEY": vault_data.get("SPACES_SECRET_KEY"),
+            "FERNET_KEY": vault_data.get("FERNET_KEY"),
+        }
+
 
 class Settings(BaseSettings):
     """
     Application-wide configuration settings.
-    Loaded from environment variables, .env files, or Vault.
+    Loaded from environment variables or .env files.
     """
 
     # === General ===
-    APP_NAME: str = "FastAPI Application"
+    APP_NAME: str = "ShopperSky App API"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: Literal["development", "testing", "production"] = "development"
-    APP_HOST: str = "127.0.0.1"
+    APP_HOST: str = "0.0.0.0"  # nosec B104
     APP_PORT: int = 8000
     LOG_LEVEL: str = "info"
-    DEBUG: bool = True
     ADMIN_FRONTEND_URL: str = "https://admin.shoppersky.com.au"
     VENDOR_FRONTEND_URL: str = "https://vendor.shoppersky.com.au"
     USERS_APPLICATION_FRONTEND_URL: str = "https://shoppersky.com.au"
@@ -46,28 +118,108 @@ class Settings(BaseSettings):
     # === Database ===
     POSTGRES_DRIVER: str = "asyncpg"
     POSTGRES_SCHEME: str = "postgresql"
-    POSTGRES_HOST: str = "192.168.0.207"  # Will be set by Vault
-    POSTGRES_PORT: int = 5432  # Will be set by Vault
-    POSTGRES_USER: str = "postgres"  # Will be set by Vault
-    POSTGRES_PASSWORD: str = "postgres"  # Will be set by Vault
-    POSTGRES_DB: str = "shoppersky"  # Will be set by Vault
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "shoppersky"
 
-    # === Vault Configuration ===
-    VAULT_URL: str = os.getenv("VAULT_URL", "http://localhost:8200")
-    VAULT_TOKEN: str = os.getenv("VAULT_TOKEN", "")
-    VAULT_SECRET_PATH: str = os.getenv("VAULT_SECRET_PATH", "v1/kv/data/secrets")
+    # === Email ===
+    SMTP_TLS: bool = True
+    SMTP_PORT: int = 587
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_USER: str = "your-email@gmail.com"
+    SMTP_PASSWORD: str = "your-smtp-password"
+    EMAIL_FROM: str = "your-email@gmail.com"
+    EMAIL_FROM_NAME: str = "Shoppersky API"
+    EMAIL_TEMPLATES_DIR: str = "templates"
+    SUPPORT_EMAIL: str = "support@shoppersky.com"
 
-    @property
-    def DATABASE_URL(self) -> str:
-        """Builds the SQLAlchemy-compatible database URL."""
-        return (
-           
-           f"{self.POSTGRES_SCHEME}+{self.POSTGRES_DRIVER}://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-
-        )
+    # === DigitalOcean Spaces ===
+    SPACES_REGION_NAME: str = "syd1"
+    SPACES_ENDPOINT_URL: str = (
+        f"https://{SPACES_REGION_NAME}.digitaloceanspaces.com"
+    )
+    SPACES_BUCKET_NAME: str = "shoppersky"
+    SPACES_ACCESS_KEY_ID: str = "spaces-access-key-id"
+    SPACES_SECRET_ACCESS_KEY: str = "spaces-secret-access-key"
 
     # === CORS ===
     ALLOWED_ORIGINS: str = "http://localhost,http://localhost:3000,https://www.shoppersky.com.au,https://admin.shoppersky.com.au,https://vendor.shoppersky.com.au"
+
+    # === Media ===
+    MEDIA_ROOT: str = "media/"
+    MEDIA_BASE_URL: str = "http://localhost:8000/media/"
+    DEFAULT_MEDIA_URL: str = "config/logo/abcd1234.png"
+    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10 MB
+    ALLOWED_MEDIA_TYPES: List[str] = [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+        "image/avif",
+        "image/jxl",
+    ]
+
+    CATEGORY_IMAGE_PATH: str = "categories/{slug_name}/"
+    SUBCATEGORY_IMAGE_PATH: str = "subcategories/{category_id}/{slug_name}/"
+    CONFIG_LOGO_PATH: str = "config/logo/"
+    PROFILE_PICTURE_UPLOAD_PATH: str = (
+        "users/profile_pictures/{username}_avatar"
+    )
+    EVENT_CARD_IMAGE_UPLOAD_PATH: str = "events/{event_id}/card_image"
+    EVENT_BANNER_IMAGE_UPLOAD_PATH: str = "events/{event_id}/banner_image"
+    EVENT_EXTRA_IMAGES_UPLOAD_PATH: str = "events/{event_id}/extra_images"
+
+    # === JWT ===
+    JWT_ALGORITHM: str = "RS256"
+    JWT_ACCESS_TOKEN_EXPIRE_SECONDS: int = 3600
+    REFRESH_TOKEN_EXPIRE_DAYS_IN_SECONDS: int = 604800
+    JWT_KEYS_DIR: str = "keys"
+    JWT_ISSUER: str = "shoppersky-api"
+    JWT_AUDIENCE: str = "shoppersky-admin"
+
+    # === AES256 Encryption ===
+    FERNET_KEY: str = "fernet-key"
+
+    # === Pydantic config ===
+    model_config = SettingsConfigDict(
+        env_file=".env.production",
+        env_file_encoding="utf-8",
+        extra="allow",
+    )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: Type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> Tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            VaultSettingsSource(settings_cls),
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+        )
+
+    @property
+    def SPACES_PUBLIC_URL(self) -> str:
+        return (
+            f"{self.SPACES_ENDPOINT_URL.rstrip('/')}/{self.SPACES_BUCKET_NAME}"
+        )
+
+    @property
+    def DATABASE_URL(self) -> str:
+        return (
+            f"{self.POSTGRES_SCHEME}+{self.POSTGRES_DRIVER}://"
+            f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
 
     @property
     def CORS_ORIGINS(self) -> List[str]:
@@ -77,201 +229,33 @@ class Settings(BaseSettings):
                 return parsed
         except json.JSONDecodeError:
             pass
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
-    # === Media ===
-    MEDIA_ROOT: str = "media/"
-    MEDIA_BASE_URL: str = "https://shoppersky.syd1.digitaloceanspaces.com/"  # Updated to Spaces
-    DEFAULT_MEDIA_URL: str = "config/logo/abcd1234.png"
-    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10 MB
-    ALLOWED_MEDIA_TYPES: List[str] = [
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-        "image/svg+xml",
-    ]
+        return [
+            origin.strip()
+            for origin in self.ALLOWED_ORIGINS.split(",")
+            if origin.strip()
+        ]
 
-    CATEGORY_IMAGE_PATH: str = "categories/{slug_name}/"
-    SUBCATEGORY_IMAGE_PATH: str = "subcategories/{category_id}/{slug_name}/"
-    CONFIG_LOGO_PATH: str = "config/logo/"
-    PROFILE_PICTURE_UPLOAD_PATH: str = "users/profile_pictures/{username}_avatar"
 
-    # === Email Configuration ===
-    # SMTP Connection Settings
-    SMTP_TLS: bool = True
-    SMTP_SSL: bool = False  # Set to True for port 465
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    SMTP_USER: str = os.getenv("SMTP_USER", "your-email@gmail.com")
-    SMTP_PASSWORD: SecretStr = SecretStr(os.getenv("SMTP_PASSWORD", "your-smtp-password"))
-    
-    # Email Identity Settings
-    EMAIL_FROM: str = os.getenv("EMAIL_FROM", "your-email@gmail.com")
-    EMAIL_FROM_NAME: str = os.getenv("EMAIL_FROM_NAME", "Shoppersky Team")
-    SUPPORT_EMAIL: str = os.getenv("SUPPORT_EMAIL", "support@shoppersky.com")
-    
-    # Email Template Settings
-    EMAIL_TEMPLATES_DIR: str = "templates"
-    EMAIL_TIMEOUT: int = 30  # SMTP timeout in seconds
-    EMAIL_MAX_RETRIES: int = 3  # Maximum retry attempts for failed emails
-    
-    # Email Provider Presets (for easy switching)
-    EMAIL_PROVIDER: Literal["gmail", "sendgrid", "brevo", "ses", "custom"] = "gmail"
-    
-    @property
-    def EMAIL_CONFIG(self) -> Dict[str, Any]:
-        """Get email configuration based on provider"""
-        provider_configs = {
-            "gmail": {
-                "SMTP_HOST": "smtp.gmail.com",
-                "SMTP_PORT": 587,
-                "SMTP_TLS": True,
-                "SMTP_SSL": False
-            },
-            "sendgrid": {
-                "SMTP_HOST": "smtp.sendgrid.net", 
-                "SMTP_PORT": 587,
-                "SMTP_TLS": True,
-                "SMTP_SSL": False
-            },
-            "brevo": {
-                "SMTP_HOST": "smtp-relay.brevo.com",
-                "SMTP_PORT": 587,
-                "SMTP_TLS": True,
-                "SMTP_SSL": False
-            },
-            "ses": {
-                "SMTP_HOST": "email-smtp.us-east-1.amazonaws.com",  # Default region
-                "SMTP_PORT": 587,
-                "SMTP_TLS": True,
-                "SMTP_SSL": False
-            },
-            "custom": {
-                "SMTP_HOST": self.SMTP_HOST,
-                "SMTP_PORT": self.SMTP_PORT,
-                "SMTP_TLS": self.SMTP_TLS,
-                "SMTP_SSL": self.SMTP_SSL
-            }
-        }
-        
-        config = provider_configs.get(self.EMAIL_PROVIDER, provider_configs["custom"])
-        return {
-            **config,
-            "SMTP_USER": self.SMTP_USER,
-            "SMTP_PASSWORD": self.SMTP_PASSWORD.get_secret_value() if isinstance(self.SMTP_PASSWORD, SecretStr) else self.SMTP_PASSWORD,
-            "EMAIL_FROM": str(self.EMAIL_FROM),
-            "EMAIL_FROM_NAME": self.EMAIL_FROM_NAME,
-            "SUPPORT_EMAIL": str(self.SUPPORT_EMAIL),
-            "EMAIL_TIMEOUT": self.EMAIL_TIMEOUT,
-            "EMAIL_MAX_RETRIES": self.EMAIL_MAX_RETRIES
-        }
-
-    # === JWT ===
-    JWT_ALGORITHM: str = "RS256"
-    JWT_ACCESS_TOKEN_EXPIRE_SECONDS: int = 3600
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    JWT_KEYS_DIR: str = "keys"
-    JWT_ISSUER: str = "shoppersky-api"
-    JWT_AUDIENCE: str = "shoppersky-admin"
-
-    # === DigitalOcean Spaces ===
-    SPACES_REGION_NAME: str = "syd1"
-    SPACES_ENDPOINT_URL: str = f"https://{SPACES_REGION_NAME}.digitaloceanspaces.com"
-    SPACES_BUCKET_NAME: str = "shoppersky"
-    SPACES_ACCESS_KEY_ID: str = "spaces-access-key-id"
-    SPACES_SECRET_ACCESS_KEY: str = "spaces-secret-access-key"
-
-    @property
-    def SPACES_PUBLIC_URL(self) -> str:
-        return (
-            f"{self.SPACES_ENDPOINT_URL.rstrip('/')}/{self.SPACES_BUCKET_NAME}"
-        )
-
-    # === Meta Configuration for Pydantic ===
-    model_config = SettingsConfigDict(
-        env_file=[".env.local", ".env.production"],  # Load from both files, .env.local takes precedence
-        env_file_encoding="utf-8",
-        extra="allow",
-    )
-
-    async def load_vault_secrets(self):
-        """Load secrets from Vault using the new secrets management system"""
-        try:
-            from core.secrets import get_secrets_manager
-            
-            secrets_manager = get_secrets_manager()
-            secrets = await secrets_manager.fetch_secrets()
-            
-            logger.info(f"🔐 Loading secrets from {'Vault' if secrets_manager.is_vault_available else 'environment variables'}")
-            
-            # Update database settings
-            self.POSTGRES_DB = secrets.get("POSTGRES_DB", self.POSTGRES_DB)
-            self.POSTGRES_HOST = secrets.get("POSTGRES_HOST", self.POSTGRES_HOST)
-            self.POSTGRES_PASSWORD = secrets.get("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD)
-            self.POSTGRES_PORT = int(secrets.get("POSTGRES_PORT", self.POSTGRES_PORT))
-            self.POSTGRES_USER = secrets.get("POSTGRES_USER", self.POSTGRES_USER)
-            
-            # Validate database credentials
-            if not all([self.POSTGRES_USER, self.POSTGRES_PASSWORD, self.POSTGRES_HOST, self.POSTGRES_DB]):
-                raise ValueError(f"Missing database credentials: user={bool(self.POSTGRES_USER)}, password={bool(self.POSTGRES_PASSWORD)}, host={bool(self.POSTGRES_HOST)}, db={bool(self.POSTGRES_DB)}")
-            
-            # Update email settings with proper type handling
-            self.SMTP_PORT = int(secrets.get("SMTP_PORT", self.SMTP_PORT))
-            self.SMTP_HOST = secrets.get("SMTP_HOST", self.SMTP_HOST)
-            self.SMTP_USER = secrets.get("SMTP_USER", self.SMTP_USER)
-            
-            # Handle SecretStr for password
-            smtp_password = secrets.get("SMTP_PASSWORD", self.SMTP_PASSWORD)
-            if isinstance(smtp_password, str):
-                self.SMTP_PASSWORD = SecretStr(smtp_password)
-            elif not isinstance(self.SMTP_PASSWORD, SecretStr):
-                self.SMTP_PASSWORD = SecretStr(str(self.SMTP_PASSWORD))
-            
-            # Update email addresses
-            email_from = secrets.get("EMAIL_FROM", self.EMAIL_FROM)
-            if isinstance(email_from, str) and email_from:
-                self.EMAIL_FROM = email_from
-                
-            support_email = secrets.get("SUPPORT_EMAIL", self.SUPPORT_EMAIL)
-            if isinstance(support_email, str) and support_email:
-                self.SUPPORT_EMAIL = support_email
-                
-            self.EMAIL_FROM_NAME = secrets.get("EMAIL_FROM_NAME", self.EMAIL_FROM_NAME)
-            
-            # Update DigitalOcean Spaces settings
-            self.SPACES_REGION_NAME = secrets.get("SPACES_REGION_NAME", self.SPACES_REGION_NAME)
-            self.SPACES_BUCKET_NAME = secrets.get("SPACES_BUCKET_NAME", self.SPACES_BUCKET_NAME)
-            self.SPACES_ACCESS_KEY_ID = secrets.get("SPACES_ACCESS_KEY_ID", self.SPACES_ACCESS_KEY_ID)
-            self.SPACES_SECRET_ACCESS_KEY = secrets.get("SPACES_SECRET_ACCESS_KEY", self.SPACES_SECRET_ACCESS_KEY)
-            
-            logger.info(f"✅ Configuration updated - DB: {self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}, Email: {self.SMTP_HOST}:{self.SMTP_PORT}")
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to load secrets: {e}")
-            # Continue with existing configuration from environment variables
-            logger.warning("⚠️  Continuing with environment variable configuration")
-
+# === Singleton accessor (ensures one instance only) ===
 @lru_cache()
 def get_settings() -> Settings:
-    settings = Settings()
-    os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
-    return settings
+    settings_instance = Settings()  # Renamed to avoid redefinition warning
 
-# Load settings synchronously for module-level access
+    # Automatically create media directory if it doesn't exist
+    os.makedirs(settings_instance.MEDIA_ROOT, exist_ok=True)
+
+    return settings_instance
+
+
+# === Load settings ===
 settings: Settings = get_settings()
 
-# KeyManager initialization for JWT
+# === KeyManager initialization for JWT ===
 key_manager = KeyManager(
     key_dir=settings.JWT_KEYS_DIR,
-    key_refresh_days=settings.REFRESH_TOKEN_EXPIRE_DAYS,
+    key_refresh_days=settings.REFRESH_TOKEN_EXPIRE_DAYS_IN_SECONDS,
 )
 
 PRIVATE_KEY = SecretBytes(key_manager.get_private_key())
 PUBLIC_KEY = SecretBytes(key_manager.get_public_key())
-
-
-
-
-
-

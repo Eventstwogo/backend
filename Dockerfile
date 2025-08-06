@@ -1,42 +1,63 @@
-# Use Python slim image
-FROM python:3.10-slim
+##############################
+# Stage 1: Builder – Install Dependencies and Build the App
+##############################
+FROM python:3.10.11-slim AS builder
 
-# Set environment variables to prevent .pyc file creation
+# Install build dependencies for native extensions (e.g. libpq for PostgreSQL)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        gettext-base && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set working directory for the builder stage
+WORKDIR /app
+
+# Copy the requirements file first to leverage Docker layer caching
+COPY requirements.txt .
+
+# Clean NULL bytes and non-UTF-8 characters from requirements.txt
+RUN tr -d '\000' < requirements.txt | iconv -f utf-8 -t utf-8 -c > cleaned.txt && mv cleaned.txt requirements.txt
+
+# Upgrade pip and install Python dependencies globally (no virtualenv used)
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of your application code into the builder
+COPY . .
+
+##############################
+# Stage 2: Runner – Prepare the Production Image
+##############################
+FROM python:3.10.11-slim
+
+# Set environment variables to improve runtime behavior
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-
-# Install system dependencies and PostgreSQL libraries
-RUN apt-get update && \
-apt-get install -y --no-install-recommends \
-libpq-dev \
-build-essential \
-&& rm -rf /var/lib/apt/lists/*
-
-# Set the working directory in the container
+# Set working directory for the runtime stage
 WORKDIR /app
 
-# Create a non-root user for security reasons (optional)
-RUN useradd -m appuser
+# Install only runtime system dependencies (libpq-dev required by your app)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy the requirements.txt and install Python dependencies
-COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy installed Python packages from the builder stage (global install from /usr/local)
+COPY --from=builder /usr/local /usr/local
 
-# Copy the rest of the application code
-COPY . /app/
+# Copy the application code from the builder stage
+COPY --from=builder /app /app
 
-# Copy .env.production as .env inside the container
-COPY .env.production /app/.env
-
-# Change ownership of files to the non-root user
-RUN chown -R appuser:appuser /app
-
-# Switch to the non-root user
+# Create a non-root user for improved container security and adjust file ownership
+RUN useradd -m appuser && \
+    chown -R appuser:appuser /app
 USER appuser
 
-# Expose the application port
-EXPOSE 8000
+# Expose the port on which the FastAPI app will run (optional)
+# EXPOSE 8000
 
-# Run the application
+# Command to start the FastAPI application using uvicorn
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

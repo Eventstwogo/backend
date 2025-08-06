@@ -5,7 +5,7 @@ from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 
 from colorlog import ColoredFormatter
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger.json import JsonFormatter
 
 
 def setup_logging() -> None:
@@ -52,7 +52,7 @@ def setup_logging() -> None:
 
     else:
         # JSON logs for cloud/docker
-        json_formatter = jsonlogger.JsonFormatter(
+        json_formatter = JsonFormatter(
             fmt="%(asctime)s %(levelname)s %(name)s %(message)s %(filename)s %(lineno)d",
             datefmt="%Y-%m-%d %H:%M:%S",
         )

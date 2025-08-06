@@ -42,6 +42,11 @@ class EmailConfig:
         """Determine if SSL should be used."""
         return self.connection_security == "ssl"
 
+    # def __post_init__(self):
+    #     """Convert password string to SecretStr if needed."""
+    #     if self.smtp_password and not isinstance(self.smtp_password, SecretStr):
+    #         self.smtp_password = SecretStr(self.smtp_password)
+
 
 # Email Utility
 class EmailSender:
@@ -121,24 +126,15 @@ class EmailSender:
                 logger.warning("Failed to close SMTP connection: %s", e)
 
 
-def get_email_config() -> EmailConfig:
-    """Get email configuration dynamically from current settings"""
-    # Get email configuration based on provider
-    email_config_dict = settings.EMAIL_CONFIG
-    
-    return EmailConfig(
-        smtp_server=email_config_dict.get("SMTP_HOST", settings.SMTP_HOST),
-        smtp_port=email_config_dict.get("SMTP_PORT", settings.SMTP_PORT),
-        smtp_username=settings.SMTP_USER,
-        smtp_password=settings.SMTP_PASSWORD.get_secret_value() if hasattr(settings.SMTP_PASSWORD, 'get_secret_value') else str(settings.SMTP_PASSWORD),
-        from_email=settings.EMAIL_FROM,
-        template_dir=settings.EMAIL_TEMPLATES_DIR,
-        connection_security="tls" if email_config_dict.get("SMTP_TLS", True) else ("ssl" if email_config_dict.get("SMTP_SSL", False) else "none"),
-    )
+# Configuration from settings
+email_config = EmailConfig(
+    smtp_server=settings.SMTP_HOST,
+    smtp_port=settings.SMTP_PORT,
+    smtp_username=settings.SMTP_USER,
+    smtp_password=settings.SMTP_PASSWORD,
+    from_email=settings.EMAIL_FROM,
+    template_dir=settings.EMAIL_TEMPLATES_DIR,
+    connection_security="tls",  # Use TLS by default (port 587), use "ssl" for port 465
+)
 
-def get_email_sender() -> EmailSender:
-    """Get email sender with current configuration"""
-    return EmailSender(get_email_config())
-
-# For backward compatibility, create a default instance
-email_sender = get_email_sender()
+email_sender = EmailSender(email_config)

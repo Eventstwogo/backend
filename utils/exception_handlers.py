@@ -112,29 +112,3 @@ def exception_handler(func: Callable[..., Any]) -> Callable[..., Any]:
             return handle_general_exception(e)
 
     return wrapper
-
-
-# from utils.exception_handlers import (
-#     handle_422_exception,
-#     handle_404_exception
-# )
-
-
-# # Register app-level exception handlers
-# app.add_exception_handler(RequestValidationError, handle_422_exception)
-# app.add_exception_handler(StarletteHTTPException, handle_404_exception)
-
-# @router.get("/{role_id}")
-# @exception_handler
-# async def get_role(role_id: str, db: AsyncSession = Depends(get_db)):
-#     result = await db.execute(select(Role).where(Role.id == role_id))
-#     role = result.scalar_one_or_none()
-
-#     if not role:
-#         return handle_not_found("Role")
-
-#     return api_response(
-#         status_code=200,
-#         message="Role fetched successfully",
-#         data=role,
-#     )

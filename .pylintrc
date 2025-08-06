@@ -1,4 +1,22 @@
 [MASTER]
-disable=C0114,C0115,C0116,W0703
-max-line-length=80
+# Disable:
+# C0114: Missing module docstring
+# C0115: Missing class docstring
+# C0116: Missing function or method docstring
+# W0703: Catching too general exception (can be risky in production)
+# R0903: Too few public methods in a class (not relevant for middleware and similar patterns)
+# R0913: Too many arguments
+# R0917: Too many positional arguments
+disable=C0114,C0115,C0116,W0703,R0903,R0913,R0917
+max-line-length=100
 ignore=tests
+init-hook='import sys; sys.path.append(".")'
+
+[REPORTS]
+output-format=colorized
+reports=yes
+
+[TYPECHECK]
+ignored-classes=sqlalchemy.sql.functions.Function
+ignored-modules=sqlalchemy.sql.functions
+extension-pkg-whitelist=sqlalchemy

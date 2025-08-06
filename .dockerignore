@@ -1,0 +1,80 @@
+# Python-related files
+# Byte-compiled / optimized Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments (if not needed in the image)
+venv/
+env/
+.venv/
+
+# Environment and configuration files (sensitive data)
+.env
+*.env
+
+# Log files (avoid transferring logs)
+*.log
+shou_log.log
+gateway_keys.txt
+
+# Uploaded or generated content (handled externally)
+uploads/
+upload/
+generated payslips/
+
+# Database files
+*.db
+*.sqlite3
+
+# IDE/editor configuration files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Temporary, backup, and miscellaneous files
+*.bak
+notes/
+# If "notes" is a file, use:
+# notes
+
+# Test, coverage, and cache directories
+.pytest_cache/
+.coverage*
+nosetests.xml
+coverage.xml
+*.cover
+
+# Packaging and build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Linters, type checkers, and other cache folders
+.mypy_cache/
+
+# Python environment/version managers
+.python-version
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Docker and CI/CD specific files (if not needed in runtime)
+docker-compose.override.yml
+
+# Exclude Docker files (they are only used for the build)
+Dockerfile*
+docker-compose*
+
+# Exclude potential IDE configuration folders (optional)
+.vscode/
+.idea/
+
+# Exclude Git repository data (source control info is not needed)
+.git
+.gitignore
