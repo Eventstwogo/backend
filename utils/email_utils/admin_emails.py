@@ -29,7 +29,7 @@ def send_admin_password_reset_email(
         "request_time": request_time
         or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "expiry_minutes": expiry_minutes,
-        "year": str(datetime.now(tz=timezone.utc).year),
+        "current_year": str(datetime.now(tz=timezone.utc).year),
         "support_email": settings.SUPPORT_EMAIL,
     }
 
@@ -65,7 +65,7 @@ def send_admin_welcome_email(
         bool: True if email was sent successfully, False otherwise
     """
     if not admin_panel_url:
-        admin_panel_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000') + "/admin"
+        admin_panel_url = settings.ADMIN_FRONTEND_URL
 
     context = {
         "username": username,
@@ -73,7 +73,7 @@ def send_admin_welcome_email(
         "password": password,
         "admin_panel_url": admin_panel_url,
         "login_url": admin_panel_url + "/login",
-        "year": str(datetime.now(tz=timezone.utc).year),
+        "current_year": str(datetime.now(tz=timezone.utc).year),
         "support_email": settings.SUPPORT_EMAIL,
     }
 

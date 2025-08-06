@@ -194,6 +194,7 @@ async def create_vendor_employee(
             business_name=vendor_business_name or "Your Business",
             username=employee_data.username,
             password=generated_password,
+            role_name=role.role_name if role else None,
         )
         
         if not email_sent:

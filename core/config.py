@@ -111,6 +111,7 @@ class Settings(BaseSettings):
     ADMIN_FRONTEND_URL: str = "https://admin.shoppersky.com.au"
     VENDOR_FRONTEND_URL: str = "https://vendor.shoppersky.com.au"
     USERS_APPLICATION_FRONTEND_URL: str = "https://shoppersky.com.au"
+    FRONTEND_URL: str = "https://shoppersky.com.au"  # Default frontend URL for emails
     DESCRIPTION: str = (
         "Shoppersky application for managing products, users and their purchases."
     )
