@@ -23,7 +23,7 @@ from schemas.register import (
 
 from services.admin_user import get_config_or_404
 from services.vendor_user import validate_unique_user
-from services.email_service import email_service
+from utils.email_utils import send_vendor_verification_email
 from utils.file_uploads import (
     get_media_url,
 )
@@ -90,13 +90,11 @@ async def register_user(
     
     # Send vendor verification email instead of welcome email
     background_tasks.add_task(
-        email_service.send_vendor_verification_email,
-        vendor_email=user_data.email,
-        vendor_name=user_data.email.split('@')[0],  # Use email prefix as vendor name for now
-        verification_token=email_token,
+        send_vendor_verification_email,
+        email=user_data.email,
         business_name="Your Business",  # You can modify this based on your vendor data
-        verification_link=verification_link,
-        expiry_minutes=30
+        verification_token=email_token,
+        expires_in_minutes=30
     )
 
     return api_response(

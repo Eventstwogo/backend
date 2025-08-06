@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 from passlib.context import CryptContext
-from services.email_service import email_service
+from utils.email_utils import send_admin_welcome_email
 from utils.validations import generate_random_password
 from core.api_response import api_response
 from db.models.superadmin import AdminUser, Config, Role
@@ -114,11 +114,10 @@ async def create_admin_user(
         email_sent = False
         
         try:
-            email_sent = email_service.send_admin_welcome_email(
+            email_sent = send_admin_welcome_email(
                 email=normalized_email,  # Use normalized email for sending
                 username=admin_data.username,
                 password=admin_data.password,  # Send the plain password in email
-                role="SUPERADMIN"
             )
         except Exception as e:
             # Log the error but don't fail the user creation

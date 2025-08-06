@@ -16,7 +16,7 @@ from schemas.vendor_employee import (
 )
 from db.sessions.database import get_db
 from utils.exception_handlers import exception_handler
-from services.email_service import EmailTemplateService
+from utils.email_utils import send_vendor_employee_credentials_email
 
 def safe_decrypt_username(encrypted_username: str, fallback: str = None) -> str:
     """Safely decrypt username with fallback handling"""
@@ -170,8 +170,6 @@ async def create_vendor_employee(
     
     # Send credentials email to the new employee
     try:
-        email_service = EmailTemplateService()
-        
         # Get vendor business name from BusinessProfile if available
         vendor_business_name = None
         try:
@@ -190,12 +188,12 @@ async def create_vendor_employee(
         except Exception:
             vendor_business_name = None
         
-        email_sent = email_service.send_vendor_employee_credentials_email(
+        email_sent = send_vendor_employee_credentials_email(
             email=employee_data.email,
+            employee_name=employee_data.username,
+            business_name=vendor_business_name or "Your Business",
             username=employee_data.username,
             password=generated_password,
-            role_name=role.role_name,
-            business_name=vendor_business_name
         )
         
         if not email_sent:

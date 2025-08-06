@@ -21,7 +21,7 @@ from services.vendor_password_reset import (
     vendor_account_not_verified,
 )
 from utils.auth import hash_password, verify_password
-from services.email_service import email_service
+from utils.email_utils import send_vendor_password_reset_email
 from utils.email_validators import EmailValidator
 from utils.exception_handlers import exception_handler
 from utils.id_generators import decrypt_data
@@ -88,9 +88,9 @@ async def forgot_password(
         # If decryption fails, use the username as-is (might be plain text)
         decrypted_username = vendor.username
     
-    email_sent = email_service.send_vendor_password_reset_email(
+    email_sent = send_vendor_password_reset_email(
         email=email,  # Use plain text email from form
-        username=decrypted_username,  # Decrypt the username
+        business_name=decrypted_username,  # Use username as business name fallback
         reset_link=reset_link,
         expiry_minutes=60,  # 1 hour expiry
         ip_address=ip_address,
