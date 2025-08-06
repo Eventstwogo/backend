@@ -33,7 +33,7 @@ def send_vendor_onboarding_email(
         bool: True if email was sent successfully, False otherwise
     """
     if not vendor_portal_url:
-        vendor_portal_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000') + "/vendor"
+        vendor_portal_url = settings.VENDOR_FRONTEND_URL
 
     context = {
         "business_name": business_name,
@@ -42,7 +42,7 @@ def send_vendor_onboarding_email(
         "password": password,
         "vendor_portal_url": vendor_portal_url,
         "login_url": vendor_portal_url + "/login",
-        "year": str(datetime.now(tz=timezone.utc).year),
+        "current_year": str(datetime.now(tz=timezone.utc).year),
         "support_email": settings.SUPPORT_EMAIL,
     }
 
@@ -78,7 +78,7 @@ def send_vendor_verification_email(
         bool: True if email was sent successfully, False otherwise
     """
     verification_link = (
-        f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/vendor/verify-email?email={email}"
+        f"{settings.VENDOR_FRONTEND_URL}/verify-email?email={email}"
         f"&token={verification_token}"
     )
 
@@ -86,8 +86,8 @@ def send_vendor_verification_email(
         "business_name": business_name,
         "email": email,
         "verification_link": verification_link,
-        "vendor_portal_url": getattr(settings, 'FRONTEND_URL', 'http://localhost:3000') + "/vendor",
-        "year": str(datetime.now(tz=timezone.utc).year),
+        "vendor_portal_url": settings.VENDOR_FRONTEND_URL,
+        "current_year": str(datetime.now(tz=timezone.utc).year),
         "expires_in_minutes": expires_in_minutes,
         "support_email": settings.SUPPORT_EMAIL,
     }
@@ -122,7 +122,7 @@ def send_vendor_password_reset_email(
         "request_time": request_time
         or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "expiry_minutes": expiry_minutes,
-        "year": str(datetime.now(tz=timezone.utc).year),
+        "current_year": str(datetime.now(tz=timezone.utc).year),
         "support_email": settings.SUPPORT_EMAIL,
     }
 
@@ -146,6 +146,7 @@ def send_vendor_employee_credentials_email(
     username: str,
     password: str,
     vendor_portal_url: Optional[str] = None,
+    role_name: Optional[str] = None,
 ) -> bool:
     """
     Send credentials email to a new vendor employee.
@@ -157,12 +158,13 @@ def send_vendor_employee_credentials_email(
         username: Employee's username
         password: Employee's temporary password
         vendor_portal_url: URL to vendor portal
+        role_name: Employee's role name
 
     Returns:
         bool: True if email was sent successfully, False otherwise
     """
     if not vendor_portal_url:
-        vendor_portal_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000') + "/vendor"
+        vendor_portal_url = settings.VENDOR_FRONTEND_URL
 
     context = {
         "employee_name": employee_name,
@@ -172,8 +174,11 @@ def send_vendor_employee_credentials_email(
         "password": password,
         "vendor_portal_url": vendor_portal_url,
         "login_url": vendor_portal_url + "/login",
-        "year": str(datetime.now(tz=timezone.utc).year),
+        "current_year": str(datetime.now(tz=timezone.utc).year),
         "support_email": settings.SUPPORT_EMAIL,
+        "frontend_url": settings.FRONTEND_URL,  # Add missing frontend_url
+        "role_name": role_name or "Employee",  # Add role_name with default
+        "creation_date": datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),  # Add creation_date
     }
 
     success = email_sender.send_email(

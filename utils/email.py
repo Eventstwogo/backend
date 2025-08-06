@@ -55,6 +55,7 @@ class EmailSender:
         self.env = Environment(
             loader=FileSystemLoader(self.config.template_dir),
             autoescape=select_autoescape(["html", "xml"]),
+            cache_size=0,  # Disable template caching for development
         )
 
     def _render_template(
@@ -66,6 +67,15 @@ class EmailSender:
         except Exception as e:
             logger.error("Template rendering failed: %s", e)
             return ""
+    
+    def reload_templates(self):
+        """Force reload all templates by recreating the Jinja2 environment."""
+        logger.info("Reloading email templates...")
+        self.env = Environment(
+            loader=FileSystemLoader(self.config.template_dir),
+            autoescape=select_autoescape(["html", "xml"]),
+            cache_size=0,  # Disable template caching for development
+        )
 
     def _connect_smtp(self) -> Optional[Union[smtplib.SMTP, smtplib.SMTP_SSL]]:
         try:

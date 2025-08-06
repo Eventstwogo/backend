@@ -29,7 +29,7 @@ def send_password_reset_email(
         "request_time": request_time
         or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "expiry_minutes": expiry_minutes,
-        "year": str(datetime.now(tz=timezone.utc).year),
+        "current_year": str(datetime.now(tz=timezone.utc).year),
         "support_email": settings.SUPPORT_EMAIL,
     }
 
@@ -67,7 +67,7 @@ def send_user_verification_email(
         bool: True if email was sent successfully, False otherwise
     """
     verification_link = (
-        f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/verify-email?email={email}"
+        f"{settings.USERS_APPLICATION_FRONTEND_URL}/verify-email?email={email}"
         f"&token={verification_token}"
     )
 
@@ -75,9 +75,9 @@ def send_user_verification_email(
         "username": username,
         "email": email,
         "verification_link": verification_link,
-        "welcome_url": getattr(settings, 'FRONTEND_URL', 'http://localhost:3000'),
-        "year": str(datetime.now(tz=timezone.utc).year),
-        "expires_in_minutes": expires_in_minutes,
+        "welcome_url": settings.USERS_APPLICATION_FRONTEND_URL,
+        "current_year": str(datetime.now(tz=timezone.utc).year),
+        "expiry_minutes": expires_in_minutes,
         "support_email": settings.SUPPORT_EMAIL,
     }
 
@@ -117,8 +117,8 @@ def send_welcome_email(
         "email": email,
         "password": password,
         "logo_url": logo_url,
-        "login_url": getattr(settings, 'FRONTEND_URL', 'http://localhost:3000') + "/login",
-        "year": str(datetime.now(tz=timezone.utc).year),
+        "login_url": settings.USERS_APPLICATION_FRONTEND_URL + "/login",
+        "current_year": str(datetime.now(tz=timezone.utc).year),
         "support_email": settings.SUPPORT_EMAIL,
     }
 
@@ -160,8 +160,8 @@ def send_order_confirmation_email(
         "email": email,
         "order_id": order_id,
         "total_amount": total_amount,
-        "order_url": getattr(settings, 'FRONTEND_URL', 'http://localhost:3000') + f"/orders/{order_id}",
-        "year": str(datetime.now(tz=timezone.utc).year),
+        "order_url": settings.USERS_APPLICATION_FRONTEND_URL + f"/orders/{order_id}",
+        "current_year": str(datetime.now(tz=timezone.utc).year),
         "support_email": settings.SUPPORT_EMAIL,
         **order_details,  # Unpack order_details to make all keys available at root level
     }
