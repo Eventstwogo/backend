@@ -4,7 +4,7 @@ from sqlalchemy import select
 from datetime import datetime
 from passlib.context import CryptContext
 
-from utils.id_generators import hash_data
+from utils.id_generators import hash_data, decrypt_data
 from db.models.superadmin import AdminUser, Config
 from schemas.admin_user import AdminLoginRequest, AdminLoginResponse
 from db.sessions.database import get_db
@@ -55,10 +55,15 @@ async def login_user(
     user.last_login = datetime.utcnow()
     await db.commit()
 
+    # Decrypt email and username for token
+    decrypted_email = decrypt_data(user.email)
+    decrypted_username = decrypt_data(user.username)
+    
     # Create JWT token
     token_data = {
         "sub": user.user_id,
-        "username": user.username,
+        "email": decrypted_email,
+        "username": decrypted_username,
         "role_id": user.role_id,
     }
     access_token = create_access_token(data=token_data)

@@ -5,7 +5,7 @@ from psycopg2 import IntegrityError
 from slugify import slugify
 
 from utils.file_uploads import get_media_url, save_uploaded_file
-# from core.upload_files_to_space import upload_file_to_s3
+from utils.upload_files import upload_file_to_s3
 from sqlalchemy.orm import selectinload
 from utils.id_generators import generate_lowercase
 from schemas.products import ProductByCategoryListResponse, ProductByCategoryResponse, ProductResponse, ProductListResponse, ProductSearchListResponse, ProductSearchResponse
@@ -790,11 +790,19 @@ async def update_product(
             cleaned_product_id = product_id.replace(" ", "_").lower()
 
             for file in files:
+                # Read file content as bytes
+                file_content = await file.read()
                 timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
                 new_filename = f"{timestamp}_{file.filename}"
                 file_path = f"products/{product_name}/{cleaned_product_id}/{new_filename}"
-                # image_url = await upload_file_to_s3(file, file_path)
-                # image_urls.append(image_url)
+                
+                # Upload file to S3 and get the URL
+                image_url = await upload_file_to_s3(
+                    file_content=file_content,
+                    file_path=file_path,
+                    file_type=file.content_type
+                )
+                image_urls.append(image_url)
 
             product.images = {"urls": image_urls}
         except Exception as e:
@@ -932,11 +940,19 @@ async def update_product_by_slug(
             cleaned_slug = slug.replace(" ", "_").lower()
 
             for file in files:
+                # Read file content as bytes
+                file_content = await file.read()
                 timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
                 new_filename = f"{timestamp}_{file.filename}"
                 file_path = f"products/{product_name}/{cleaned_slug}/{new_filename}"
-                # image_url = await upload_file_to_s3(file, file_path)
-                # image_urls.append(image_url)
+                
+                # Upload file to S3 and get the URL
+                image_url = await upload_file_to_s3(
+                    file_content=file_content,
+                    file_path=file_path,
+                    file_type=file.content_type
+                )
+                image_urls.append(image_url)
 
             product.images = {"urls": image_urls}
         except Exception as e:
