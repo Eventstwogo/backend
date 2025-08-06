@@ -1,10 +1,11 @@
 import smtplib
-from datetime import datetime, timezone
+from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
-from pydantic import EmailStr, SecretStr
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pydantic import EmailStr
 
 from core.config import settings
 from core.logging_config import get_logger
@@ -12,400 +13,132 @@ from core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-# Simple Email Configuration
+@dataclass
 class EmailConfig:
-    SMTP_SERVER: str
-    SMTP_PORT: int
-    SMTP_USERNAME: str
-    SMTP_PASSWORD: SecretStr
-    FROM_EMAIL: str
-    USE_TLS: bool = True
-    USE_SSL: bool = False
+    """Email configuration class using dataclass to reduce boilerplate."""
 
-    def __init__(
-        self,
-        smtp_server: str,
-        smtp_port: int,
-        smtp_username: str,
-        smtp_password: str,
-        from_email: str,
-        use_tls: bool = True,
-        use_ssl: bool = False,
-    ):
-        self.SMTP_SERVER = smtp_server
-        self.SMTP_PORT = smtp_port
-        self.SMTP_USERNAME = smtp_username
-        self.SMTP_PASSWORD = SecretStr(smtp_password)
-        self.FROM_EMAIL = from_email
-        self.USE_TLS = use_tls
-        self.USE_SSL = use_ssl
+    # SMTP connection details
+    smtp_server: str
+    smtp_port: int
+
+    # Authentication
+    smtp_username: str
+    smtp_password: str
+
+    # Email content settings
+    from_email: str
+    template_dir: str
+
+    # Connection security (combined into a single attribute)
+    connection_security: str = "tls"  # Options: "tls", "ssl", "none"
+
+    @property
+    def use_tls(self) -> bool:
+        """Determine if TLS should be used."""
+        return self.connection_security == "tls"
+
+    @property
+    def use_ssl(self) -> bool:
+        """Determine if SSL should be used."""
+        return self.connection_security == "ssl"
 
 
-# Simple Email Utility
+# Email Utility
 class EmailSender:
     def __init__(self, config: EmailConfig):
         self.config = config
+        self.env = Environment(
+            loader=FileSystemLoader(self.config.template_dir),
+            autoescape=select_autoescape(["html", "xml"]),
+        )
+
+    def _render_template(
+        self, template_file: str, context: Dict[str, Any]
+    ) -> str:
+        try:
+            template = self.env.get_template(template_file)
+            return template.render(**context)
+        except Exception as e:
+            logger.error("Template rendering failed: %s", e)
+            return ""
 
     def _connect_smtp(self) -> Optional[Union[smtplib.SMTP, smtplib.SMTP_SSL]]:
         try:
-            if self.config.USE_SSL:
+            if self.config.use_ssl:
                 server: Union[smtplib.SMTP, smtplib.SMTP_SSL] = (
                     smtplib.SMTP_SSL(
-                        self.config.SMTP_SERVER, self.config.SMTP_PORT
+                        self.config.smtp_server, self.config.smtp_port
                     )
                 )
             else:
                 server = smtplib.SMTP(
-                    self.config.SMTP_SERVER, self.config.SMTP_PORT
+                    self.config.smtp_server, self.config.smtp_port
                 )
-                if self.config.USE_TLS:
+                if self.config.use_tls:
                     server.starttls()
             server.login(
-                self.config.SMTP_USERNAME,
-                self.config.SMTP_PASSWORD.get_secret_value(),
+                self.config.smtp_username,
+                self.config.smtp_password,
             )
             return server
         except Exception as e:
-            logger.error(f"SMTP connection/login failed: {e}")
+            logger.error("SMTP connection/login failed: %s", e)
             return None
 
-    def send_text_email(
+    def send_email(
         self,
         to: EmailStr,
         subject: str,
-        body: str,
+        template_file: str,
+        context: Dict[str, Any],
     ) -> bool:
-        """Send a plain text email to a recipient."""
+        """Send a rendered HTML email to a recipient."""
         server = self._connect_smtp()
         if not server:
             return False
 
+        html = self._render_template(template_file, context)
+        if not html:
+            return False
+
         msg = MIMEMultipart()
-        msg["From"] = self.config.FROM_EMAIL
+        msg["From"] = self.config.from_email
         msg["To"] = to
         msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
+        msg.attach(MIMEText(html, "html"))
 
         try:
-            server.sendmail(self.config.FROM_EMAIL, to, msg.as_string())
-            logger.info(f"Email sent to {to}")
+            server.sendmail(self.config.from_email, to, msg.as_string())
+            logger.info("Email sent to %s", to)
             return True
         except Exception as e:
-            logger.error(f"Failed to send email: {e}")
+            logger.error("Failed to send email: %s", e)
             return False
         finally:
             try:
                 server.quit()
             except Exception as e:
-                logger.warning(f"Failed to close SMTP connection: {e}")
+                logger.warning("Failed to close SMTP connection: %s", e)
 
 
-# Configuration from your settings
-config = EmailConfig(
-    smtp_server=settings.SMTP_HOST,
-    smtp_port=settings.SMTP_PORT,
-    smtp_username=settings.SMTP_USER,
-    smtp_password=settings.SMTP_PASSWORD,
-    from_email=settings.EMAIL_FROM,
-    use_tls=True,
-    use_ssl=False,  # Set True only for port 465
-)
+def get_email_config() -> EmailConfig:
+    """Get email configuration dynamically from current settings"""
+    # Get email configuration based on provider
+    email_config_dict = settings.EMAIL_CONFIG
+    
+    return EmailConfig(
+        smtp_server=email_config_dict.get("SMTP_HOST", settings.SMTP_HOST),
+        smtp_port=email_config_dict.get("SMTP_PORT", settings.SMTP_PORT),
+        smtp_username=settings.SMTP_USER,
+        smtp_password=settings.SMTP_PASSWORD.get_secret_value() if hasattr(settings.SMTP_PASSWORD, 'get_secret_value') else str(settings.SMTP_PASSWORD),
+        from_email=settings.EMAIL_FROM,
+        template_dir=settings.EMAIL_TEMPLATES_DIR,
+        connection_security="tls" if email_config_dict.get("SMTP_TLS", True) else ("ssl" if email_config_dict.get("SMTP_SSL", False) else "none"),
+    )
 
-email_sender = EmailSender(config)
+def get_email_sender() -> EmailSender:
+    """Get email sender with current configuration"""
+    return EmailSender(get_email_config())
 
-
-def send_welcome_email(
-    email: EmailStr, password: str, logo_url: str
-) -> None:
-    """Send a welcome email to a new user."""
-    # Use the new email service for better templates
-    try:
-        from services.email_service import email_service
-        username = email.split('@')[0]  # Extract username from email
-        success = email_service.send_welcome_email(
-            email=email,
-            username=username,
-            password=password
-        )
-        if not success:
-            logger.warning(f"Failed to send welcome email to {email}")
-    except ImportError:
-        # Fallback to old method if new service is not available
-        body = f"""
-Welcome to Shoppersky!
-
-Your account has been created successfully.
-
-Login Details:
-- Email: {email}
-- Password: {password}
-- Login URL: {settings.USERS_APPLICATION_FRONTEND_URL}
-
-Please change your password after your first login for security.
-
-Best regards,
-Shoppersky Team
-
-© {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
-        """
-
-        success = email_sender.send_text_email(
-            to=email,
-            subject="Welcome to Shoppersky!",
-            body=body,
-        )
-
-        if not success:
-            logger.warning(f"Failed to send welcome email to {email}")
-
-
-def send_admin_welcome_email(
-    email: EmailStr, username: str, password: str, role: str = "Admin"
-) -> bool:
-    """Send welcome email to new admin user using the new template"""
-    try:
-        from services.email_service import email_service
-        return email_service.send_admin_welcome_email(
-            email=email,
-            username=username,
-            password=password,
-            role=role
-        )
-    except ImportError:
-        # Fallback to basic email if new service is not available
-        body = f"""
-Welcome to Shoppersky Admin Panel!
-
-Your administrator account has been created successfully.
-
-Admin Details:
-- Email: {email}
-- Username: {username}
-- Password: {password}
-- Role: {role}
-- Admin Panel: {settings.ADMIN_FRONTEND_URL}
-
-Please change your password after your first login for security.
-
-Best regards,
-Shoppersky Admin Team
-
-© {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
-        """
-        
-        success = email_sender.send_text_email(
-            to=email,
-            subject="Welcome to Shoppersky Admin Panel",
-            body=body,
-        )
-        return success
-
-
-def send_vendor_onboarding_email(
-    email: EmailStr, vendor_name: str, business_name: str, reference_number: str
-) -> bool:
-    """Send onboarding email to new vendor using the new template"""
-    try:
-        from services.email_service import email_service
-        return email_service.send_vendor_onboarding_email(
-            email=email,
-            vendor_name=vendor_name,
-            business_name=business_name,
-            reference_number=reference_number
-        )
-    except ImportError:
-        # Fallback to basic email if new service is not available
-        body = f"""
-Welcome to Shoppersky Vendor Portal!
-
-Your vendor account has been successfully created and approved.
-
-Vendor Details:
-- Business Name: {business_name}
-- Vendor Name: {vendor_name}
-- Vendor ID: {vendor_id}
-- Email: {email}
-- Vendor Portal: {settings.VENDOR_FRONTEND_URL}
-
-You can now start adding products and managing your store.
-
-Best regards,
-Shoppersky Vendor Team
-
-© {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
-        """
-        
-        success = email_sender.send_text_email(
-            to=email,
-            subject="Welcome to Shoppersky Vendor Portal",
-            body=body,
-        )
-        return success
-
-
-def send_admin_password_reset_email(
-    email: EmailStr,
-    username: str,
-    reset_link: str,
-    expiry_minutes: int,
-    ip_address: str,
-    request_time: str,
-) -> bool:
-    """Send a password reset email to an admin user."""
-    # Use the new email service for better templates
-    try:
-        from services.email_service import email_service
-        return email_service.send_password_reset_email(
-            email=email,
-            username=username,
-            reset_link=reset_link,
-            expiry_minutes=expiry_minutes,
-            ip_address=ip_address
-        )
-    except ImportError:
-        # Fallback to old method if new service is not available
-        body = f"""
-Hello {username},
-
-We received a request to reset your password for your Shoppersky admin account.
-
-Reset Link: {reset_link}
-
-This link will expire in {expiry_minutes} minutes for security reasons.
-
-Security Information:
-- Request Time: {request_time}
-- IP Address: {ip_address}
-
-If you didn't request this password reset, you can safely ignore this email.
-
-For security reasons, we recommend:
-- Using a strong, unique password
-- Not sharing your login credentials
-- Logging out when finished using the admin panel
-
-Best regards,
-Shoppersky Team
-
-© {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
-        """
-        
-        success = email_sender.send_text_email(
-            to=email,
-            subject="Password Reset Request - Shoppersky Admin",
-            body=body,
-        )
-        return success
-
-
-def send_user_password_reset_email(
-    email: str,
-    username: str,
-    reset_link: str,
-    expiry_minutes: int,
-    ip_address: str,
-    request_time: str,
-) -> bool:
-    """Send a password reset email to a regular user."""
-    # Use the new email service for better templates
-    try:
-        from services.email_service import email_service
-        return email_service.send_user_password_reset_email(
-            email=email,
-            username=username,
-            reset_link=reset_link,
-            expiry_minutes=expiry_minutes,
-            ip_address=ip_address
-        )
-    except ImportError:
-        # Fallback to old method if new service is not available
-        body = f"""
-Hello {username},
-
-We received a request to reset your password for your Shoppersky account.
-
-Reset Link: {reset_link}
-
-This link will expire in {expiry_minutes} minutes for security reasons.
-
-Security Information:
-- Request Time: {request_time}
-- IP Address: {ip_address}
-
-If you didn't request this password reset, you can safely ignore this email.
-
-For security reasons, we recommend:
-- Using a strong, unique password
-- Not sharing your login credentials
-- Logging out when finished using your account
-
-Best regards,
-Shoppersky Team
-
-© {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
-        """
-        
-        success = email_sender.send_text_email(
-            to=email,
-            subject="Password Reset Request - Shoppersky",
-            body=body,
-        )
-        return success
-
-
-def send_vendor_password_reset_email(
-    email: str,
-    username: str,
-    reset_link: str,
-    expiry_minutes: int,
-    ip_address: str,
-    request_time: str,
-) -> bool:
-    """Send a password reset email to a vendor user."""
-    try:
-        from services.email_service import email_service
-        return email_service.send_vendor_password_reset_email(
-            email=email,
-            username=username,
-            reset_link=reset_link,
-            expiry_minutes=expiry_minutes,
-            ip_address=ip_address,
-            request_time=request_time,
-        )
-    except ImportError:
-        # Fallback to old method if new service is not available
-        body = f"""
-Hello,
-
-We received a request to reset your password for your Shoppersky vendor account.
-
-Reset Link: {reset_link}
-
-This link will expire in {expiry_minutes} minutes for security reasons.
-
-Security Information:
-- Request Time: {request_time}
-- IP Address: {ip_address}
-
-If you didn't request this password reset, you can safely ignore this email.
-
-For security reasons, we recommend:
-- Using a strong, unique password
-- Not sharing your login credentials
-- Logging out when finished using your account
-
-Best regards,
-Shoppersky Team
-
-© {datetime.now(tz=timezone.utc).year} Shoppersky. All rights reserved.
-        """
-        
-        success = email_sender.send_text_email(
-            to=email,
-            subject="Password Reset Request - Shoppersky Vendor",
-            body=body,
-        )
-        return success
-    except Exception as e:
-        print(f"Failed to send vendor password reset email: {e}")
-        return False
+# For backward compatibility, create a default instance
+email_sender = get_email_sender()

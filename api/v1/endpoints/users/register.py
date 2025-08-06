@@ -12,7 +12,7 @@ from db.models.general import User, UserVerification
 from db.sessions.database import get_db
 from schemas.register import UserRegisterRequest, UserRegisterResponse, UserVerificationRequest, UserVerificationResponse, ResendVerificationRequest, ResendVerificationResponse
 from services.admin_user import get_config_or_404
-from services.email_service import send_user_verification_email
+from utils.email_utils import send_user_verification_email
 from services.user_service import validate_unique_user, generate_verification_tokens
 from utils.auth import hash_password
 from utils.exception_handlers import exception_handler

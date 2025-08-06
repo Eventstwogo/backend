@@ -15,7 +15,7 @@ from schemas.vendor_onboarding import OnboardingRequest
 from utils.id_generators import encrypt_data, encrypt_dict_values, generate_digits_letters, hash_data, decrypt_data
 from db.models.superadmin import BusinessProfile, VendorLogin, Industries
 from services.business_profile import fetch_abn_details, validate_abn_id
-from services.email_service import email_service
+from utils.email_utils import send_vendor_onboarding_email
 from db.sessions.database import get_db
 
 
@@ -158,12 +158,11 @@ async def vendor_onboarding(
             
             # Send onboarding confirmation email with reference number
             background_tasks.add_task(
-                email_service.send_vendor_onboarding_email,
+                send_vendor_onboarding_email,
                 email=vendor_email,
-                vendor_name=vendor_name,
                 business_name=business_name,
-                reference_number=ref_number,  # Using reference number
-                status="Active"
+                username=vendor_name,
+                password="Please check your previous credentials",  # Placeholder since this is onboarding confirmation
             )
         except Exception as email_error:
             # Log the error but don't fail the onboarding process

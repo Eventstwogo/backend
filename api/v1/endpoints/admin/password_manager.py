@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 
 from utils.auth import hash_password, verify_password
 from utils.validations import validate_password
-from services.email_service import email_service
+from utils.email_utils import send_admin_password_reset_email
 from utils.email_validators import EmailValidator
 from utils.exception_handlers import exception_handler
 from core.status_codes import APIResponse, StatusCode
@@ -212,7 +212,7 @@ async def forgot_password(
     # Use the plain text email from the form input and decrypt the username
     decrypted_username = decrypt_data(user.username)
     
-    email_service.send_password_reset_email(
+    send_admin_password_reset_email(
         email=email,  # Use plain text email from form
         username=decrypted_username,  # Decrypt the username
         reset_link=reset_link,

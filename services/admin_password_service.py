@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 
 from core.config import settings
 from core.logging_config import get_logger
-from services.email_service import email_service
+from utils.email_utils import send_admin_welcome_email
 
 logger = get_logger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -96,12 +96,11 @@ This is an automated message. Please do not reply to this email.
     """
 
     try:
-        # Use the enhanced email service to send admin welcome email
-        success = email_service.send_admin_welcome_email(
+        # Use the simplified email utility to send admin welcome email
+        success = send_admin_welcome_email(
             email=email,
             username=username,
             password=password,
-            role="ADMIN"
         )
         
         if success:

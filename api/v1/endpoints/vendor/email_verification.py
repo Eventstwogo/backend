@@ -3,7 +3,7 @@ from sqlalchemy import select
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.vendor_onboarding import ResendVerificationRequest
-from services import email_service
+from utils.email_utils import send_vendor_verification_email
 from db.models.superadmin import VendorLogin, VendorSignup, Role
 from utils.id_generators import  hash_data, generate_digits_letters, generate_digits_lowercase, generate_digits_uppercase, random_token
 from utils.exception_handlers import exception_handler
@@ -12,9 +12,6 @@ from db.sessions.database import get_db
 from core.api_response import api_response
 from urllib.parse import quote
 from core.config import settings
-
-from utils.id_generators import  hash_data, generate_digits_letters, generate_digits_lowercase, generate_digits_uppercase, random_token
-from fastapi import APIRouter, Depends, status, BackgroundTasks
 
 router = APIRouter()
 
@@ -259,13 +256,11 @@ async def resend_verification_email(
    
     # Send verification email in background
     background_tasks.add_task(
-        email_service.send_vendor_verification_email,
-        vendor_email=request.email,
-        vendor_name=request.email.split('@')[0],  # Use email prefix as vendor name
-        verification_token=new_email_token,
+        send_vendor_verification_email,
+        email=request.email,
         business_name="Your Business",
-        verification_link=verification_link,
-        expiry_minutes=30
+        verification_token=new_email_token,
+        expires_in_minutes=30
     )
    
     return api_response(

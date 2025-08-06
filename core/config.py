@@ -67,7 +67,7 @@ class Settings(BaseSettings):
         )
 
     # === CORS ===
-    ALLOWED_ORIGINS: str = "http://localhost,http://localhost:3000"
+    ALLOWED_ORIGINS: str = "http://localhost,http://localhost:3000,https://www.shoppersky.com.au,https://admin.shoppersky.com.au,https://vendor.shoppersky.com.au"
 
     @property
     def CORS_ORIGINS(self) -> List[str]:
@@ -190,7 +190,7 @@ class Settings(BaseSettings):
 
     # === Meta Configuration for Pydantic ===
     model_config = SettingsConfigDict(
-        env_file=".env.production",
+        env_file=[".env.local", ".env.production"],  # Load from both files, .env.local takes precedence
         env_file_encoding="utf-8",
         extra="allow",
     )
