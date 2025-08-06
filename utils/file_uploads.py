@@ -16,13 +16,16 @@ logger = get_logger(__name__)
 async def save_uploaded_file(
     file: UploadFile,
     relative_sub_path: str,
-) -> str | None:
+) -> str:
     """
     Validates and uploads a file to DigitalOcean Spaces.
     Returns the relative path for DB/API usage.
     """
     if not file or not file.filename:
-        return None
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is required.",
+        )
 
     if not is_valid_filename(file.filename):
         file.filename = sanitize_filename(file.filename)
@@ -113,4 +116,4 @@ def get_media_url(relative_path: Optional[str]) -> Optional[str]:
     if not relative_path:
         return None
 
-    return urljoin(settings.SPACES_PUBLIC_URL.rstrip("/") + "/", relative_path)
+    return urljoin(settings.spaces_public_url.rstrip("/") + "/", relative_path)

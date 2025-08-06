@@ -2,7 +2,8 @@
 Vendor password management schemas.
 """
 
-from pydantic import BaseModel, Field
+import re
+from pydantic import BaseModel, Field, field_validator
 
 class VendorForgotPasswordRequest(BaseModel):
     """Schema for vendor forgot password request."""
@@ -25,6 +26,23 @@ class VendorResetPasswordRequest(BaseModel):
         description="New password (8-12 characters)"
     )
 
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if len(v) > 12:
+            raise ValueError("Password must be at most 12 characters long.")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must include at least one uppercase letter.")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must include at least one lowercase letter.")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must include at least one digit.")
+        if not re.search(r"[^\w\s]", v):
+            raise ValueError("Password must include at least one special character.")
+        return v
+
 
 class VendorResetPasswordResponse(BaseModel):
     """Schema for vendor reset password response."""
@@ -42,6 +60,23 @@ class VendorChangePasswordRequest(BaseModel):
         description="New password (8-12 characters)"
     )
 
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if len(v) > 12:
+            raise ValueError("Password must be at most 12 characters long.")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must include at least one uppercase letter.")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must include at least one lowercase letter.")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must include at least one digit.")
+        if not re.search(r"[^\w\s]", v):
+            raise ValueError("Password must include at least one special character.")
+        return v
+
 
 class VendorChangePasswordResponse(BaseModel):
     """Schema for vendor change password response."""
@@ -56,6 +91,23 @@ class VendorChangeInitialPasswordRequest(BaseModel):
         max_length=12,
         description="New password (8-12 characters)"
     )
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if len(v) > 12:
+            raise ValueError("Password must be at most 12 characters long.")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must include at least one uppercase letter.")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must include at least one lowercase letter.")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must include at least one digit.")
+        if not re.search(r"[^\w\s]", v):
+            raise ValueError("Password must include at least one special character.")
+        return v
 
 
 class VendorChangeInitialPasswordResponse(BaseModel):

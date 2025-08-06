@@ -2,7 +2,7 @@
 Vendor password management endpoints.
 """
 
-from fastapi import APIRouter, Depends, status, Form, Request
+from fastapi import APIRouter, Depends, status, Form, Request, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
@@ -10,6 +10,10 @@ from datetime import datetime, timezone
 from core.api_response import api_response
 from core.config import settings
 from db.sessions.database import get_db
+from schemas.vendor_password import (
+    VendorChangeInitialPasswordRequest,
+    VendorChangeInitialPasswordResponse,
+)
 from services.vendor_password_reset import (
     get_vendor_by_email,
     generate_password_reset_token,
@@ -180,11 +184,11 @@ async def reset_password_with_token(
     )
 
 
-@router.post("/change-initial-password", status_code=status.HTTP_200_OK)
+@router.post("/change-initial-password", response_model=VendorChangeInitialPasswordResponse)
 @exception_handler
 async def change_initial_password(
-    email: str = Form(...),
-    new_password: str = Form(...),
+    password_data: VendorChangeInitialPasswordRequest,
+    email: str = Query(..., description="Vendor email address"),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Change initial password for a vendor by email"""
@@ -207,8 +211,14 @@ async def change_initial_password(
             message="Account is inactive. Cannot change password.",
         )
     
+    if vendor.login_status != -1:  # -1 means initial password for employee
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Initial password can only be changed once.",
+        )
+    
     # Step 3: Validate new password format
-    validation_result = validate_password(new_password)
+    validation_result = validate_password(password_data.new_password)
     if validation_result["status_code"] != 200:
         return api_response(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -216,17 +226,18 @@ async def change_initial_password(
         )
     
     # Step 4: Prevent using the same password as current password
-    if verify_password(new_password, vendor.password):
+    if verify_password(password_data.new_password, vendor.password):
         return api_response(
             status_code=status.HTTP_409_CONFLICT,
             message="New password cannot be the same as current password.",
         )
     
     # Step 5: Update the password
-    vendor.password = hash_password(new_password)
+    vendor.password = hash_password(password_data.new_password)
     vendor.login_status = 0  # Normal login status
     vendor.login_failed_attempts = 0  # Reset login attempts
     vendor.locked_time = None  # Clear lock timestamp if any
+    vendor.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     await db.refresh(vendor)

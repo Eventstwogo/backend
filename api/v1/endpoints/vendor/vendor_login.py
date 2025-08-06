@@ -60,7 +60,13 @@ async def login_user(
                 status_code=404,
                 detail="Account not found. Please register first."
             )
-
+        
+    if user.login_status == -1:
+        raise HTTPException(
+            status_code=403,
+            detail="Please change your default password."
+        )
+    
     # Step 3: Account lock
     if user.login_status == 1:
         raise HTTPException(
