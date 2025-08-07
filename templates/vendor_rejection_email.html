@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to Shoppersky Vendor Portal</title>
+    <title>Vendor Application Update - Shoppersky</title>
     <style>
         * {
             margin: 0;
@@ -28,11 +28,10 @@
         }
         
         .header {
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-            color: #2c3e50;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: #ffffff;
             padding: 30px 20px;
             text-align: center;
-            border-bottom: 2px solid #e9ecef;
         }
         
         .header h1 {
@@ -66,7 +65,7 @@
         
         .info-box {
             background-color: #f8f9fa;
-            border-left: 4px solid #6c757d;
+            border-left: 4px solid #3498db;
             padding: 20px;
             margin: 25px 0;
             border-radius: 5px;
@@ -122,32 +121,57 @@
         
         .status-badge {
             display: inline-block;
-            background-color: #f39c12;
+            background-color: #e74c3c;
             color: white;
-            padding: 5px 15px;
+            padding: 8px 20px;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: 600;
             text-transform: uppercase;
             margin: 10px 0;
         }
         
-        .onboarding-steps {
-            background-color: #f8f9fa;
+        .rejection-reason {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        
+        .rejection-reason h4 {
+            color: #721c24;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .rejection-reason p {
+            color: #721c24;
+            font-size: 16px;
+            line-height: 1.6;
+            background-color: #ffffff;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #e74c3c;
+        }
+        
+        .improvement-steps {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
             border-radius: 8px;
             padding: 20px;
             margin: 25px 0;
         }
         
-        .onboarding-steps h3 {
-            color: #2c3e50;
+        .improvement-steps h3 {
+            color: #856404;
             margin-bottom: 15px;
             font-size: 18px;
         }
         
         .step {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 15px;
             padding: 15px;
             background-color: white;
@@ -184,23 +208,23 @@
             font-size: 14px;
         }
         
-        .benefits-box {
-            background-color: #e8f5e8;
-            border: 1px solid #c3e6c3;
+        .contact-info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
             border-radius: 5px;
             padding: 15px;
             margin: 25px 0;
         }
         
-        .benefits-box h4 {
-            color: #155724;
+        .contact-info h4 {
+            color: #0c5460;
             margin-bottom: 10px;
         }
         
-        .benefits-box p {
-            color: #155724;
+        .contact-info p {
+            color: #0c5460;
             font-size: 14px;
-            margin-bottom: 8px;
+            margin-bottom: 5px;
         }
         
         .footer {
@@ -224,25 +248,6 @@
         .vendor-icon {
             font-size: 48px;
             margin-bottom: 20px;
-        }
-        
-        .contact-info {
-            background-color: #d1ecf1;
-            border: 1px solid #bee5eb;
-            border-radius: 5px;
-            padding: 15px;
-            margin: 25px 0;
-        }
-        
-        .contact-info h4 {
-            color: #0c5460;
-            margin-bottom: 10px;
-        }
-        
-        .contact-info p {
-            color: #0c5460;
-            font-size: 14px;
-            margin-bottom: 5px;
         }
         
         @media (max-width: 600px) {
@@ -289,111 +294,103 @@
     <div class="email-container">
         <div class="header">
             <div class="vendor-icon">📋</div>
-            <h1>Vendor Application Submitted</h1>
-            <p>Your vendor application is under review</p>
+            <h1>Application Update</h1>
+            <p>Regarding your vendor application</p>
         </div>
         
         <div class="content">
-            <div class="greeting">Hello {{ vendor_name }}!</div>
+            <div class="greeting">Hello {{ vendor_name }},</div>
             
             <div class="message">
-                <p>Thank you for submitting your vendor application to join the Shoppersky marketplace! We have received your onboarding request and it is currently under review by our team.</p>
+                <p>Thank you for your interest in joining the Shoppersky marketplace. We have carefully reviewed your vendor application and unfortunately, we are unable to approve it at this time.</p>
             </div>
             
-            <div class="status-badge">PENDING APPROVAL</div>
+            <div class="status-badge">❌ NOT APPROVED</div>
             
             <div class="info-box">
                 <h3>📋 Your Application Details</h3>
-                <!-- <div class="info-item">
+                <div class="info-item">
                     <span class="info-label">Business Name:</span>
                     <span class="info-value">{{ business_name }}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Application Email:</span>
                     <span class="info-value">{{ email }}</span>
-                </div> -->
+                </div>
                 <div class="info-item">
                     <span class="info-label">Reference ID:</span>
-                    <span class="info-value" style="background-color: #fff3cd; padding: 8px 12px; border-radius: 5px; border: 2px solid #f39c12; font-weight: bold; color: #856404; font-size: 16px;">{{ reference_id }}</span>
-                </div>
-                <!-- <div class="info-item">
-                    <span class="info-label">Application Status:</span>
-                    <span class="info-value">Pending Approval</span>
+                    <span class="info-value" style="background-color: #d1ecf1; padding: 8px 12px; border-radius: 5px; border: 2px solid #3498db; font-weight: bold; color: #0c5460; font-size: 16px;">{{ reference_id }}</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">Submitted Date:</span>
-                    <span class="info-value">{{ submission_date }}</span>
-                </div> -->
+                    <span class="info-label">Review Date:</span>
+                    <span class="info-value">{{ review_date }}</span>
+                </div>
             </div>
             
-            <div style="text-align: center;">
-                <a href="{{ vendor_portal_url }}" class="button">Check Application Status</a>
+            {% if reviewer_comment %}
+            <!-- <div class="rejection-reason">
+                <h4>📝 Reason for Rejection</h4>
+                <p>{{ reviewer_comment }}</p>
             </div>
+            {% endif %}
             
-            <!-- <div class="onboarding-steps">
-                <h3>🚀 Getting Started - Next Steps</h3>
+            <div class="improvement-steps">
+                <h3>💡 How to Improve Your Application</h3>
                 
                 <div class="step">
                     <div class="step-number">1</div>
                     <div class="step-content">
-                        <div class="step-title">Complete Your Business Profile</div>
-                        <div class="step-description">Add your business description, logo, and contact information to build trust with customers.</div>
+                        <div class="step-title">Review Application Requirements</div>
+                        <div class="step-description">Ensure all required documents and information are complete and accurate.</div>
                     </div>
                 </div>
                 
                 <div class="step">
                     <div class="step-number">2</div>
                     <div class="step-content">
-                        <div class="step-title">Set Up Payment & Shipping</div>
-                        <div class="step-description">Configure your payment methods and shipping options to start receiving orders.</div>
+                        <div class="step-title">Address Feedback Points</div>
+                        <div class="step-description">Review the rejection reason above and make necessary improvements to your business profile.</div>
                     </div>
                 </div>
                 
                 <div class="step">
                     <div class="step-number">3</div>
                     <div class="step-content">
-                        <div class="step-title">Add Your First Products</div>
-                        <div class="step-description">Upload product images, descriptions, and pricing to start selling immediately.</div>
+                        <div class="step-title">Verify Business Information</div>
+                        <div class="step-description">Double-check that all business details, ABN, and contact information are current and valid.</div>
                     </div>
                 </div>
                 
                 <div class="step">
                     <div class="step-number">4</div>
                     <div class="step-content">
-                        <div class="step-title">Review Vendor Guidelines</div>
-                        <div class="step-description">Familiarize yourself with our policies, quality standards, and best practices.</div>
+                        <div class="step-title">Resubmit Your Application</div>
+                        <div class="step-description">Once you've addressed the issues, you're welcome to submit a new application.</div>
                     </div>
                 </div>
-            </div> -->
+            </div>
             
-            <!-- <div class="benefits-box">
-                <h4>🎯 Vendor Benefits & Features</h4>
-                <p>• Access to thousands of active customers on our platform</p>
-                <p>• Comprehensive analytics and sales reporting tools</p>
-                <p>• Integrated payment processing and automated payouts</p>
-                <p>• Marketing tools and promotional opportunities</p>
-                <p>• 24/7 vendor support and dedicated account management</p>
-                <p>• Mobile-friendly vendor dashboard for on-the-go management</p>
-            </div> -->
+            <div style="text-align: center;">
+                <a href="{{ vendor_portal_url }}" class="button">Submit New Application</a>
+            </div>
             
-            <!-- <div class="contact-info">
-                <h4>📞 Vendor Support Contact</h4>
-                <p><strong>Email:</strong> vendor-support@shoppersky.com</p>
-                <p><strong>Phone:</strong> {{ support_phone|default("+1 (555) 123-4567") }}</p>
+            <div class="contact-info">
+                <h4>📞 Need Help?</h4>
+                <p><strong>Email:</strong> {{ support_email }}</p>
                 <p><strong>Support Hours:</strong> Monday - Friday, 9 AM - 6 PM EST</p>
-                <p><strong>Emergency Support:</strong> Available 24/7 for critical issues</p>
+                <p>Our team is here to help you understand the requirements and improve your application.</p>
             </div> -->
             
             <div class="message">
-                <p>Our team will review your application within 2-3 business days. You will receive an email notification once your application has been processed. Please keep your reference ID safe as you may need it for future correspondence.</p>
+                <p>We appreciate your interest in partnering with Shoppersky. While your current application was not approved, we encourage you to address the feedback and reapply when ready.</p>
                 
-                <p>If you have any questions about your application status, please contact our vendor support team and provide your reference ID for faster assistance.</p>
+                <p>If you have any questions about the rejection or need clarification on our requirements, please contact our vendor support team with your reference ID.</p>
             </div>
         </div>
         
         <div class="footer">
             <p><strong>Shoppersky Vendor Relations Team</strong></p>
-            <p>Thank you for choosing Shoppersky</p>
+            <p>Thank you for your interest in Shoppersky</p>
             <div class="company-info">
                 <p>&copy; {{ current_year }} Shoppersky. All rights reserved.</p>
                 <p>This email contains important vendor application information.</p>

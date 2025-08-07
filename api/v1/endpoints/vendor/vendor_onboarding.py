@@ -163,6 +163,7 @@ async def vendor_onboarding(
                 business_name=business_name,
                 username=vendor_name,
                 password="Please check your previous credentials",  # Placeholder since this is onboarding confirmation
+                reference_id=ref_number,
             )
         except Exception as email_error:
             # Log the error but don't fail the onboarding process

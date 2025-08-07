@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence, Tuple
-
+from datetime import datetime, timezone
 from fastapi import status
 from sqlalchemy import case, func, select, or_, and_, update
 from sqlalchemy.engine.row import Row
@@ -732,6 +732,18 @@ async def get_admin_user_details(
         # Get profile picture URL if exists
         profile_picture_url = get_media_url(user.profile_picture) if user.profile_picture else None
         
+        # Format dates as dd-mm-yyyy
+        # Get join date - use created_at if available, otherwise try updated_at, or use current date as fallback
+        
+        join_date_raw = user.created_at if user.created_at else user.updated_at
+        if not join_date_raw:
+            # If both are None, use current date as fallback (this shouldn't happen for new users)
+            print("DEBUG: Both created_at and updated_at are None, using current date")
+            join_date_raw = datetime.now(timezone.utc)
+        
+        join_date = join_date_raw.strftime("%d-%m-%Y") if join_date_raw else None
+        print(f"DEBUG: final join_date = {join_date}")
+
         return AdminUserDetailResponse(
             user_id=user.user_id,
             username=decrypted_username,
@@ -740,8 +752,7 @@ async def get_admin_user_details(
             role_name=user.role.role_name if user.role else "Unknown",
             profile_picture_url=profile_picture_url,
             is_active=user.is_active,
-            created_at=user.created_at,
-            last_login=user.last_login
+            join_date=join_date,
         )
         
     except Exception as e:

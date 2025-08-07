@@ -457,3 +457,4 @@ class AdminUserDetailResponse(BaseModel):
     role_name: str
     profile_picture_url: Optional[str] = None
     is_active: bool
+    join_date: Optional[str] = None  # Format: dd-mm-yyyy
