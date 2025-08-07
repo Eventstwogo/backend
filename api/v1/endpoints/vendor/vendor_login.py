@@ -5,7 +5,7 @@ from sqlalchemy import select
 from datetime import datetime
 from passlib.context import CryptContext
 
-from utils.id_generators import hash_data
+from utils.id_generators import hash_data, decrypt_data
 from db.models.superadmin import BusinessProfile, VendorLogin, VendorSignup
 from schemas.admin_user import AdminLoginRequest, AdminLoginResponse, AdminUserInfo
 from db.sessions.database import get_db
@@ -149,9 +149,19 @@ async def login_user(
         reviewer_comment= reviewer_comment
     )
 
+    # Decrypt email and username for token
+    try:
+        decrypted_email = decrypt_data(user.email)
+        decrypted_username = decrypt_data(user.username) if user.username != "unknown" else "unknown"
+    except Exception:
+        # Fallback to encrypted values if decryption fails
+        decrypted_email = user.email
+        decrypted_username = user.username if user.username != "unknown" else "unknown"
+
     token_data = {
         "userId": user.user_id,
-       
+        "email": decrypted_email,
+        "username": decrypted_username
     }
 
     access_token = create_access_token(data=token_data)

@@ -43,11 +43,15 @@ class VendorProductInfo(BaseModel):
     status_flags: Dict[str, bool]
 
 
+class VendorSubcategoryInfo(BaseModel):
+    subcategory_id: str
+    subcategory_name: str
+
+
 class VendorCategoryManagementInfo(BaseModel):
     category_id: str
     category_name: str
-    subcategory_id: Optional[str] = None
-    subcategory_name: Optional[str] = None
+    subcategories: List[VendorSubcategoryInfo] = []
 
 
 class VendorProductsAndCategoriesResponse(BaseModel):
@@ -71,6 +75,8 @@ class VendorUserDetailResponse(BaseModel):
     username: str
     email: EmailStr
     store_name: Optional[str] = None
+    store_url: Optional[str] = None
     role_id: Optional[str] = None
     role: Optional[str] = None
     profile_picture_url: Optional[str] = None
+    join_date: Optional[str] = None  # Format: dd-mm-yyyy
