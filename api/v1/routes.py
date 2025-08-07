@@ -159,5 +159,5 @@ api_router.include_router(
 )
 
 api_router.include_router(
-    queries.router, prefix="/users/vendor_admin_queries", tags=["Vendor Admin Queries"]
+    queries.router, prefix="/vendor/vendor_admin_queries", tags=["Vendor Admin Queries"]
 )

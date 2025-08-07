@@ -356,17 +356,6 @@ class BusinessProfile(Base):
     )
 
 
-class AdminVendorEnquiries(Base):
-    __tablename__ = "admin_vendor_enquiries"
-    sno: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement= True)
-    vendor_id: Mapped[str] = mapped_column(String, nullable=False)
-    admin_id:  Mapped[str] = mapped_column(String, nullable=False)
-    enquiry: Mapped[str]= mapped_column(String, nullable=False)
-    answers: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    status: Mapped[int] = mapped_column(Integer, default=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-
 # Event listener to automatically generate store_slug from store_name
 @event.listens_for(BusinessProfile.store_name, 'set')
 def generate_store_slug(target, value, oldvalue, initiator):

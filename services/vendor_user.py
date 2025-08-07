@@ -8,7 +8,8 @@ from starlette.responses import JSONResponse
 from core.api_response import api_response
 from db.models.superadmin import Category, Config, VendorSignup, VendorLogin, BusinessProfile, Role
 from schemas.vendor_details import VendorProfilePictureUploadResponse, VendorUserDetailResponse
-
+from utils.file_uploads import get_media_url
+from utils.id_generators import decrypt_data
 
 async def validate_unique_user(db: AsyncSession, email_hash: str):
     # First check if email exists in ven_signup table
@@ -165,8 +166,6 @@ async def get_vendor_user_details(
     Returns:
         VendorUserDetailResponse or JSONResponse with error
     """
-    from utils.file_uploads import get_media_url
-    from utils.id_generators import decrypt_data
     
     # Get the user first without relationships to test basic query
     result = await db.execute(
@@ -190,17 +189,19 @@ async def get_vendor_user_details(
             
         decrypted_email = decrypt_data(user.email)
         
-        # Get store name from business profile (null for employees)
+        # Get store name and store url from business profile (null for employees)
         store_name = None
+        store_url = None
         if user.business_profile_id:
-            # Query business profile separately
+            # Query business profile once for both store_name and store_url
             business_result = await db.execute(
                 select(BusinessProfile).where(BusinessProfile.profile_ref_id == user.business_profile_id)
             )
             business_profile = business_result.scalar_one_or_none()
             if business_profile:
                 store_name = business_profile.store_name
-        
+                store_url = business_profile.store_url
+
         # Get role name
         role_name = None
         role_id = user.role
@@ -215,15 +216,22 @@ async def get_vendor_user_details(
         
         # Get profile picture URL if exists
         profile_picture_url = get_media_url(user.profile_pic) if user.profile_pic else None
+
+        # Get join date - prefer created_at (timezone-aware) over timestamp (timezone-naive)
+        join_date_raw = user.created_at if user.created_at else user.timestamp
+        # Format join date as dd-mm-yyyy
+        join_date = join_date_raw.strftime("%d-%m-%Y") if join_date_raw else None
         
         return VendorUserDetailResponse(
             user_id=user.user_id,
             username=decrypted_username,
             email=decrypted_email,
             store_name=store_name,
+            store_url=store_url,
             role_id=role_id,
             role=role_name,
-            profile_picture_url=profile_picture_url
+            profile_picture_url=profile_picture_url,
+            join_date=join_date
         )
         
     except Exception as e:

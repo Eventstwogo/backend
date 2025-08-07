@@ -238,51 +238,106 @@ async def unmap_vendor_category_mapping(
     Unmaps a vendor's category or subcategory mapping by performing soft delete.
     Sets is_active to True (True means inactive) instead of physically deleting the record.
     - If subcategory_id is provided, unmaps the specific subcategory mapping.
-    - If subcategory_id is not provided, unmaps the category mapping only (subcategory_id is NULL or empty string).
+    - If subcategory_id is not provided, unmaps the category mapping AND all subcategory mappings for that category.
     """
     if payload.subcategory_id:
-        # Unmap subcategory mapping
+        # Unmap specific subcategory mapping
         stmt = select(VendorCategoryManagement).where(
             VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
             VendorCategoryManagement.category_id == payload.category_id,
             VendorCategoryManagement.subcategory_id == payload.subcategory_id
         )
+        
+        result = await db.execute(stmt)
+        mapping = result.scalar_one_or_none()
+
+        if not mapping:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Subcategory mapping not found."
+            )
+
+        # Perform soft delete by setting is_active to True (True means inactive)
+        mapping.is_active = True
+        
+        try:
+            await db.commit()
+            return {
+                "status": "success",
+                "message": "Vendor subcategory mapping unmapped successfully."
+            }
+        except Exception as e:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to unmap vendor-subcategory mapping: " + str(e)
+            )
     else:
-        # Unmap category-only mapping (NULL or empty string)
+        # Unmap category and all its subcategories
+        # First, get all mappings for this vendor and category (including subcategories)
         stmt = select(VendorCategoryManagement).where(
             VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
-            VendorCategoryManagement.category_id == payload.category_id,
-            or_(
-                VendorCategoryManagement.subcategory_id.is_(None),
-                VendorCategoryManagement.subcategory_id == ""
+            VendorCategoryManagement.category_id == payload.category_id
+        )
+        
+        result = await db.execute(stmt)
+        mappings = result.scalars().all()
+
+        if not mappings:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No mappings found for this vendor and category."
             )
-        )
 
-    result = await db.execute(stmt)
-    mapping = result.scalar_one_or_none()
+        # Count how many mappings will be unmapped
+        unmapped_count = 0
+        category_unmapped = False
+        subcategories_unmapped = 0
 
-    if not mapping:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Mapping not found."
-        )
+        # Perform soft delete on all mappings (category and subcategories)
+        for mapping in mappings:
+            if mapping.is_active == False:  # Only unmap active mappings (False means active)
+                mapping.is_active = True  # Set to True to make inactive
+                unmapped_count += 1
+                
+                if mapping.subcategory_id is None or mapping.subcategory_id == "":
+                    category_unmapped = True
+                else:
+                    subcategories_unmapped += 1
 
-    # Perform soft delete by setting is_active to True (True means inactive)
-    mapping.is_active = True
-    
-    try:
-        await db.commit()
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to unmap vendor-category mapping: " + str(e)
-        )
-
-    return {
-        "status": "success",
-        "message": "Vendor category mapping unmapped successfully."
-    }
+        if unmapped_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No active mappings found to unmap for this vendor and category."
+            )
+        
+        try:
+            await db.commit()
+            
+            # Create detailed success message
+            message_parts = []
+            if category_unmapped:
+                message_parts.append("category mapping")
+            if subcategories_unmapped > 0:
+                message_parts.append(f"{subcategories_unmapped} subcategory mapping(s)")
+            
+            message = f"Vendor {' and '.join(message_parts)} unmapped successfully."
+            
+            return {
+                "status": "success",
+                "message": message,
+                "details": {
+                    "total_unmapped": unmapped_count,
+                    "category_unmapped": category_unmapped,
+                    "subcategories_unmapped": subcategories_unmapped
+                }
+            }
+        except Exception as e:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to unmap vendor-category mappings: " + str(e)
+            )
 
 
 @router.get("/")

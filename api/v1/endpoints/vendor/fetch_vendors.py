@@ -656,21 +656,38 @@ async def get_vendor_products_and_categories(
     ).outerjoin(
         SubCategory, VendorCategoryManagement.subcategory_id == SubCategory.subcategory_id
     ).where(
-        VendorCategoryManagement.vendor_ref_id == vendor.user_id
+        VendorCategoryManagement.vendor_ref_id == vendor.user_id,
+        VendorCategoryManagement.is_active == False  # False means active
     )
     
     category_management_result = await db.execute(category_management_stmt)
     category_management_data = category_management_result.all()
     
-    # Process category management information
-    category_management_info = []
+    # Process category management information - group by category
+    category_dict = {}
     for ven_cat_mgmt, category, subcategory in category_management_data:
-        category_management_info.append({
-            "category_id": category.category_id,
-            "category_name": category.category_name,
-            "subcategory_id": subcategory.subcategory_id if subcategory else None,
-            "subcategory_name": subcategory.subcategory_name if subcategory else None,
-        })
+        category_id = category.category_id
+        
+        # Initialize category if not exists
+        if category_id not in category_dict:
+            category_dict[category_id] = {
+                "category_id": category.category_id,
+                "category_name": category.category_name,
+                "subcategories": []
+            }
+        
+        # Add subcategory if it exists and not already added
+        if subcategory:
+            subcategory_info = {
+                "subcategory_id": subcategory.subcategory_id,
+                "subcategory_name": subcategory.subcategory_name
+            }
+            # Check if subcategory is already added to avoid duplicates
+            if subcategory_info not in category_dict[category_id]["subcategories"]:
+                category_dict[category_id]["subcategories"].append(subcategory_info)
+    
+    # Convert dictionary to list
+    category_management_info = list(category_dict.values())
     
     # Get store name and slug from business profile
     store_name = business_profile.store_name
