@@ -41,42 +41,71 @@ router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 @router.post("/update-password", response_model=UpdatePasswordResponse)
+@exception_handler
 async def update_password(
-    user_id: str = Query(..., description="User ID"),
-    body: UpdatePasswordBody = Depends(),
+    user_id: str = Query(..., description="Admin User ID to update password for"),
+    request_data: UpdatePasswordBody = ...,
     db: AsyncSession = Depends(get_db),
 )-> JSONResponse:
-    # Fetch user by user_id
+    """Update password for an admin user (requires current password)"""
+    
+    # Step 1: Fetch user by user_id
     stmt = select(AdminUser).where(AdminUser.user_id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Admin user not found.",
+            log_error=True,
+        )
 
-    # Verify old password
-    if not pwd_context.verify(body.old_password, user.password):
-        raise HTTPException(status_code=401, detail="Old password is incorrect.")
+    # Step 2: Check if user account is active (False = active, True = deactivated)
+    if user.is_active:  # True means account is deactivated
+        return api_response(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Account is deactivated. Cannot update password.",
+            log_error=True,
+        )
 
-    # Validate new password format
-    validation_result = validate_password(body.new_password)
+    # Step 3: Verify old password
+    if not pwd_context.verify(request_data.old_password, user.password):
+        return api_response(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            message="Current password is incorrect.",
+            log_error=True,
+        )
+
+    # Step 4: Validate new password format (already validated by schema, but keeping for extra validation)
+    validation_result = validate_password(request_data.new_password)
     if validation_result["status_code"] != 200:
-        raise HTTPException(status_code=400, detail=validation_result["message"])
+        return api_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=validation_result["message"],
+        )
 
-    # Check if new password is same as old password
-    if pwd_context.verify(body.new_password, user.password):
-        raise HTTPException(status_code=400, detail="New password cannot be the same as the old password.")
+    # Step 5: Check if new password is same as old password
+    if pwd_context.verify(request_data.new_password, user.password):
+        return api_response(
+            status_code=status.HTTP_409_CONFLICT,
+            message="New password cannot be the same as current password.",
+        )
 
-    # Hash and update password
-    user.password = pwd_context.hash(body.new_password)
-    user.login_status = 0
-    user.login_attempts = 0
+    # Step 6: Hash and update password
+    user.password = pwd_context.hash(request_data.new_password)
+    user.login_status = 0  # Normal login status
+    user.login_attempts = 0  # Reset login attempts
     user.updated_at = datetime.utcnow()
     user.days_180_timestamp = datetime.utcnow() 
 
     await db.commit()
+    await db.refresh(user)
 
-    return UpdatePasswordResponse(message="Password updated successfully.")
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Password updated successfully.",
+    )
 
 
 

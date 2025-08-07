@@ -13,6 +13,8 @@ from db.sessions.database import get_db
 from schemas.vendor_password import (
     VendorChangeInitialPasswordRequest,
     VendorChangeInitialPasswordResponse,
+    VendorChangePasswordRequest,
+    VendorChangePasswordResponse,
 )
 from services.vendor_password_reset import (
     get_vendor_by_email,
@@ -248,12 +250,11 @@ async def change_initial_password(
     )
 
 
-@router.post("/change-password", status_code=status.HTTP_200_OK)
+@router.post("/update-password", response_model=VendorChangePasswordResponse)
 @exception_handler
-async def change_password(
-    user_id: str = Form(...),
-    current_password: str = Form(...),
-    new_password: str = Form(...),
+async def update_password(
+    user_id: str = Query(..., description="Vendor User ID to change password for"),
+    request_data: VendorChangePasswordRequest = ...,
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Change password for an authenticated vendor (requires current password)"""
@@ -282,33 +283,34 @@ async def change_password(
             log_error=True,
         )
     
-    # Step 4: Verify current password
-    if not verify_password(current_password, vendor.password):
+    # Step 3: Verify current password
+    if not verify_password(request_data.current_password, vendor.password):
         return api_response(
             status_code=status.HTTP_401_UNAUTHORIZED,
             message="Current password is incorrect.",
             log_error=True,
         )
     
-    # Step 5: Validate new password format
-    validation_result = validate_password(new_password)
+    # Step 4: Validate new password format (already validated by schema, but keeping for extra validation)
+    validation_result = validate_password(request_data.new_password)
     if validation_result["status_code"] != 200:
         return api_response(
             status_code=status.HTTP_400_BAD_REQUEST,
             message=validation_result["message"],
         )
     
-    # Step 6: Prevent using the same password
-    if verify_password(new_password, vendor.password):
+    # Step 5: Prevent using the same password
+    if verify_password(request_data.new_password, vendor.password):
         return api_response(
             status_code=status.HTTP_409_CONFLICT,
             message="New password cannot be the same as current password.",
         )
     
-    # Step 7: Update the password
-    vendor.password = hash_password(new_password)
+    # Step 6: Update the password
+    vendor.password = hash_password(request_data.new_password)
     vendor.login_failed_attempts = 0  # Reset failed login attempts
     vendor.locked_time = None  # Clear lock timestamp if any
+    vendor.login_status = 0  # Normal login status
     
     await db.commit()
     await db.refresh(vendor)

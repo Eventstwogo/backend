@@ -137,20 +137,40 @@ async def add_vendor_category_mapping(
         VendorCategoryManagement.subcategory_id == payload.subcategory_id
     )
     full_result = await db.execute(check_full_stmt)
-    if full_result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This vendor-category-subcategory mapping already exists."
-        )
+    existing_mapping = full_result.scalar_one_or_none()
+
+    if existing_mapping:
+        if not existing_mapping.is_active:
+            # Mapping already exists and is active (is_active = False means active)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This vendor-category-subcategory mapping already exists and is active."
+            )
+        else:
+            # Mapping exists but is inactive (is_active = True means inactive), reactivate it
+            existing_mapping.is_active = False  # Set to False to make it active
+            try:
+                await db.commit()
+                return {
+                    "status": "success",
+                    "message": "Vendor category mapping reactivated successfully."
+                }
+            except Exception as e:
+                await db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Failed to reactivate vendor-category mapping: " + str(e)
+                )
 
     # 4. Remove the conflicting mapping check to allow independent subcategory mappings
     # (Commenting out or removing the previous step 4 logic)
 
-    # 5. Save to VendorCategoryManagement
+    # 5. Save to VendorCategoryManagement (create new mapping with is_active = False for active)
     new_entry = VendorCategoryManagement(
         vendor_ref_id=payload.vendor_ref_id,
         category_id=payload.category_id,
-        subcategory_id=payload.subcategory_id  # can be None
+        subcategory_id=payload.subcategory_id,  # can be None
+        is_active=False  # Set to False to make it active
     )
 
     db.add(new_entry)
@@ -175,8 +195,6 @@ async def remove_vendor_category_mapping(
 ):
     """
     Removes a vendor's category or subcategory mapping.
-    - If subcategory_id is provided, removes the specific subcategory mapping.
-    - If subcategory_id is not provided, removes the category mapping only (subcategory_id is NULL or empty string).
     """
     if payload.subcategory_id:
         # Remove subcategory mapping
@@ -211,6 +229,61 @@ async def remove_vendor_category_mapping(
     }
 
 
+@router.post("/unmap")
+async def unmap_vendor_category_mapping(
+    payload: VendorCategoryRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Unmaps a vendor's category or subcategory mapping by performing soft delete.
+    Sets is_active to True (True means inactive) instead of physically deleting the record.
+    - If subcategory_id is provided, unmaps the specific subcategory mapping.
+    - If subcategory_id is not provided, unmaps the category mapping only (subcategory_id is NULL or empty string).
+    """
+    if payload.subcategory_id:
+        # Unmap subcategory mapping
+        stmt = select(VendorCategoryManagement).where(
+            VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
+            VendorCategoryManagement.category_id == payload.category_id,
+            VendorCategoryManagement.subcategory_id == payload.subcategory_id
+        )
+    else:
+        # Unmap category-only mapping (NULL or empty string)
+        stmt = select(VendorCategoryManagement).where(
+            VendorCategoryManagement.vendor_ref_id == payload.vendor_ref_id,
+            VendorCategoryManagement.category_id == payload.category_id,
+            or_(
+                VendorCategoryManagement.subcategory_id.is_(None),
+                VendorCategoryManagement.subcategory_id == ""
+            )
+        )
+
+    result = await db.execute(stmt)
+    mapping = result.scalar_one_or_none()
+
+    if not mapping:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Mapping not found."
+        )
+
+    # Perform soft delete by setting is_active to True (True means inactive)
+    mapping.is_active = True
+    
+    try:
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to unmap vendor-category mapping: " + str(e)
+        )
+
+    return {
+        "status": "success",
+        "message": "Vendor category mapping unmapped successfully."
+    }
+
 
 @router.get("/")
 @exception_handler
@@ -240,11 +313,15 @@ async def get_all_categories(
             data=[],
         )
 
-    # Organize mappings: category_id -> list of subcategory_ids
+    # Organize mappings: category_id -> list of subcategory_ids with mapping status
     from collections import defaultdict
     category_map = defaultdict(set)
+    mapping_status = {}  # Store mapping status for each category-subcategory combination
     for entry in vendor_mappings:
         category_map[entry.category_id].add(entry.subcategory_id)
+        # Create a unique key for category-subcategory combination
+        key = f"{entry.category_id}_{entry.subcategory_id if entry.subcategory_id else 'none'}"
+        mapping_status[key] = entry.is_active
 
     # Step 2: Fetch all required categories
     stmt = select(Category).where(Category.category_id.in_(category_map.keys()))
@@ -260,6 +337,10 @@ async def get_all_categories(
             if sub.subcategory_id in category_map[cat.category_id]
         ]
 
+        # Get category mapping status (for category-only mappings)
+        category_only_key = f"{cat.category_id}_none"
+        category_mapping_status = mapping_status.get(category_only_key, None)
+
         data.append(
             {
                 "category_id": cat.category_id,
@@ -273,6 +354,7 @@ async def get_all_categories(
                 "show_in_menu": cat.show_in_menu,
                 "category_status": cat.category_status,
                 "category_tstamp": cat.category_tstamp.isoformat() if cat.category_tstamp else None,
+                "vendor_category_mapping_status": category_mapping_status,  # Added mapping status
                 "has_subcategories": len(subcats) > 0,
                 "subcategory_count": len(subcats),
                 "subcategories": [
@@ -281,6 +363,7 @@ async def get_all_categories(
                         "subcategory_name": sub.subcategory_name.title(),
                         "subcategory_description": sub.subcategory_description,
                         "subcategory_status": sub.subcategory_status,
+                        "vendor_subcategory_mapping_status": mapping_status.get(f"{cat.category_id}_{sub.subcategory_id}", None),  # Added mapping status
                     }
                     for sub in subcats
                 ],

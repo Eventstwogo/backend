@@ -295,6 +295,7 @@ class VendorLogin(Base):
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), default=None)
     role: Mapped[Optional[str]] = mapped_column(ForeignKey("sa_roles.role_id"), nullable=True)
     vendor_ref_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="unknown")
+    profile_pic: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -3,7 +3,8 @@ Vendor password management schemas.
 """
 
 import re
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+from utils.validators import normalize_whitespace
 
 class VendorForgotPasswordRequest(BaseModel):
     """Schema for vendor forgot password request."""
@@ -51,18 +52,43 @@ class VendorResetPasswordResponse(BaseModel):
 
 class VendorChangePasswordRequest(BaseModel):
     """Schema for vendor change password request."""
-    user_id: str = Field(..., description="Vendor user ID")
-    current_password: str = Field(..., description="Current password")
+    current_password: str = Field(
+        ...,
+        min_length=1,
+        title="Current Password",
+        description="Vendor's current password for verification.",
+    )
     new_password: str = Field(
         ..., 
         min_length=8, 
         max_length=12,
-        description="New password (8-12 characters)"
+        title="New Password",
+        description="New password (8-12 characters with uppercase, lowercase, digit, and special character)."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_fields(cls, values):
+        """Validate required fields."""
+        required_fields = ["current_password", "new_password"]
+        for field in required_fields:
+            if not values.get(field):
+                raise ValueError(f"{field.replace('_', ' ').title()} is required.")
+        return values
+
+    @field_validator("current_password")
+    @classmethod
+    def validate_current_password(cls, v):
+        """Validate current password."""
+        v = normalize_whitespace(v)
+        if not v:
+            raise ValueError("Current password cannot be empty.")
+        return v
 
     @field_validator("new_password")
     @classmethod
     def validate_password(cls, v):
+        """Validate password strength."""
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters long.")
         if len(v) > 12:

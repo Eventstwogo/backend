@@ -11,7 +11,8 @@ from starlette.responses import JSONResponse
 from core.api_response import api_response
 from db.models.superadmin import AdminUser, Config, Role
 from schemas.admin_user import (
-    AdminUser as AdminUserSchema, 
+    AdminUser as AdminUserSchema,
+    AdminUserDetailResponse, 
     PaginatedAdminListResponse,
     AdminUpdateRequest,
     AdminUpdateResponse,
@@ -19,6 +20,10 @@ from schemas.admin_user import (
     AdminRestoreResponse
 )
 from utils.id_generators import decrypt_data, hash_data, encrypt_data
+from fastapi import UploadFile
+from schemas.admin_user import AdminProfilePictureUploadResponse
+from utils.file_uploads import save_uploaded_file, remove_file_if_exists, get_media_url
+from core.config import settings
 
 async def get_admin_user_analytics(
     db: AsyncSession,
@@ -684,5 +689,118 @@ async def hard_delete_admin_user(
         return api_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=f"Failed to permanently delete admin user: {str(e)}",
+            log_error=True,
+        )
+
+
+async def get_admin_user_details(
+    db: AsyncSession, 
+    user_id: str
+) -> JSONResponse | AdminUserDetailResponse:
+    """
+    Get detailed information about an admin user by ID.
+    
+    Args:
+        db: Database session
+        user_id: Admin user ID
+        
+    Returns:
+        AdminUserDetailResponse or JSONResponse with error
+    """
+    from schemas.admin_user import AdminUserDetailResponse
+    from utils.file_uploads import get_media_url
+    from utils.id_generators import decrypt_data
+    
+    # Get the user with role information
+    result = await db.execute(
+        select(AdminUser).options(selectinload(AdminUser.role)).where(AdminUser.user_id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="User not found.",
+            log_error=True,
+        )
+    
+    try:
+        # Decrypt sensitive data
+        decrypted_username = decrypt_data(user.username)
+        decrypted_email = decrypt_data(user.email)
+        
+        # Get profile picture URL if exists
+        profile_picture_url = get_media_url(user.profile_picture) if user.profile_picture else None
+        
+        return AdminUserDetailResponse(
+            user_id=user.user_id,
+            username=decrypted_username,
+            email=decrypted_email,
+            role_id=user.role_id,
+            role_name=user.role.role_name if user.role else "Unknown",
+            profile_picture_url=profile_picture_url,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            last_login=user.last_login
+        )
+        
+    except Exception as e:
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to retrieve user details: {str(e)}",
+            log_error=True,
+        )
+
+
+async def upload_admin_profile_picture(
+    db: AsyncSession, 
+    user_id: str, 
+    file: "UploadFile"
+) -> JSONResponse | AdminProfilePictureUploadResponse:
+    """
+    Upload profile picture for an admin user.
+    
+    Args:
+        db: Database session
+        user_id: Admin user ID
+        file: Uploaded file
+        
+    Returns:
+        AdminProfilePictureUploadResponse or JSONResponse with error
+    """
+
+    
+    # Get the user
+    user = await get_user_by_id(db, user_id)
+    if isinstance(user, JSONResponse):
+        return user
+    
+    try:
+        # Remove old profile picture if exists
+        if user.profile_picture:
+            await remove_file_if_exists(user.profile_picture)
+        
+        # Upload new profile picture
+        upload_path = settings.PROFILE_PICTURE_UPLOAD_PATH.format(username=user.username)
+        relative_path = await save_uploaded_file(file, upload_path)
+        
+        # Update user's profile picture in database
+        user.profile_picture = relative_path
+        await db.commit()
+        
+        # Get the full URL for response
+        profile_picture_url = get_media_url(relative_path)
+        
+        return AdminProfilePictureUploadResponse(
+            user_id=user_id,
+            profile_picture_url=profile_picture_url,
+            message="Profile picture uploaded successfully."
+        )
+        
+    except Exception as e:
+        await db.rollback()
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to upload profile picture: {str(e)}",
             log_error=True,
         )
