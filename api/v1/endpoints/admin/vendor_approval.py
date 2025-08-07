@@ -1,5 +1,5 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 import math
@@ -10,6 +10,7 @@ from schemas.vendor_management import RejectRequest, VendorActionRequest, Vendor
 from schemas.products import AllProductsListResponse, AllProductsResponse
 from utils.file_uploads import get_media_url
 from utils.id_generators import decrypt_data
+from utils.email_utils.vendor_emails import send_vendor_approval_email, send_vendor_rejection_email
 
 
 router = APIRouter()
@@ -18,6 +19,7 @@ router = APIRouter()
 @router.post("/vendor/approve", response_model=dict)
 async def approve_vendor(
     user_id: str,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     # Fetch vendor
@@ -48,7 +50,25 @@ async def approve_vendor(
     await db.commit()
     await db.refresh(vendor)
     
-    return {"message": f"Vendor approved successfully"}
+    # Send approval email in background
+    try:
+        vendor_email = decrypt_data(vendor.email)
+        vendor_name = business_profile.store_name or "Vendor"
+        business_name = business_profile.store_name or "Your Business"
+        reference_id = business_profile.ref_number
+        
+        background_tasks.add_task(
+            send_vendor_approval_email,
+            email=vendor_email,
+            vendor_name=vendor_name,
+            business_name=business_name,
+            reference_id=reference_id,
+        )
+    except Exception as email_error:
+        # Log the error but don't fail the approval process
+        print(f"Warning: Failed to send approval email: {str(email_error)}")
+    
+    return {"message": f"Vendor approved successfully. Approval email sent."}
 
 
 
@@ -57,6 +77,7 @@ async def approve_vendor(
 async def reject_vendor(
     user_id: str,
     data: RejectRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     # Fetch vendor
@@ -85,7 +106,26 @@ async def reject_vendor(
     db.add_all([vendor, business_profile])
     await db.commit()
 
-    return {"message": f"Vendor rejected successfully"}
+    # Send rejection email in background
+    try:
+        vendor_email = decrypt_data(vendor.email)
+        vendor_name = business_profile.store_name or "Vendor"
+        business_name = business_profile.store_name or "Your Business"
+        reference_id = business_profile.ref_number
+        
+        background_tasks.add_task(
+            send_vendor_rejection_email,
+            email=vendor_email,
+            vendor_name=vendor_name,
+            business_name=business_name,
+            reference_id=reference_id,
+            reviewer_comment=data.comment,
+        )
+    except Exception as email_error:
+        # Log the error but don't fail the rejection process
+        print(f"Warning: Failed to send rejection email: {str(email_error)}")
+
+    return {"message": f"Vendor rejected successfully. Rejection email sent."}
 
 
 @router.post("/vendor/onhold", response_model=dict)

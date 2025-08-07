@@ -235,7 +235,7 @@ async def forgot_password(
     )
 
     # Step 6: Create the reset link
-    reset_link = f"{settings.ADMIN_FRONTEND_URL}/reset-password?email={email}&token={reset_token}"
+    reset_link = f"{settings.ADMIN_FRONTEND_URL}/resetpassword?email={email}&token={reset_token}"
 
     # Step 7: Send the password reset email
     # Use the plain text email from the form input and decrypt the username
