@@ -1,5 +1,4 @@
-
-from fastapi import APIRouter, Depends, Query, status, Path
+from fastapi import APIRouter, Depends, Query, status, Path, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 
@@ -10,14 +9,18 @@ from schemas.admin_user import (
     AdminUpdateRequest,
     AdminUpdateResponse,
     AdminDeleteResponse,
-    AdminRestoreResponse
+    AdminRestoreResponse,
+    AdminProfilePictureUploadResponse,
+    AdminUserDetailResponse
 )
 from services.admin_user import (
     get_all_admin_users,
     update_admin_user,
     soft_delete_admin_user,
     restore_admin_user,
-    hard_delete_admin_user
+    hard_delete_admin_user,
+    upload_admin_profile_picture,
+    get_admin_user_details
 )
 from utils.exception_handlers import exception_handler
 
@@ -78,6 +81,33 @@ async def get_admin_users(
     )
 
 
+@router.get(
+    "/{user_id}/admin-profile-details",
+    response_model=AdminUserDetailResponse,
+    status_code=status.HTTP_200_OK,
+)
+@exception_handler
+async def admin_profile_details(
+    user_id: str = Path(..., description="Admin user ID to retrieve"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get detailed information about an admin user by ID.
+    
+    Returns the user's email, username, role, profile picture URL, and other details.
+    """
+    result = await get_admin_user_details(db=db, user_id=user_id)
+
+    if isinstance(result, JSONResponse):
+        return result
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Admin user details retrieved successfully.",
+        data=result.model_dump(),
+    )
+
+
 @router.put(
     "/{user_id}",
     response_model=AdminUpdateResponse,
@@ -96,6 +126,35 @@ async def update_admin_user_by_id(
     Validates that username and email are unique and ensures only one superadmin exists.
     """
     result = await update_admin_user(db=db, user_id=user_id, update_data=update_data)
+
+    if isinstance(result, JSONResponse):
+        return result
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message=result.message,
+        data=result.model_dump(),
+    )
+
+
+@router.post(
+    "/{user_id}/profile-picture",
+    response_model=AdminProfilePictureUploadResponse,
+    status_code=status.HTTP_200_OK,
+)
+@exception_handler
+async def upload_admin_profile_picture_by_id(
+    user_id: str = Path(..., description="Admin user ID to upload profile picture for"),
+    file: UploadFile = File(..., description="Profile picture file to upload"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Upload profile picture for an admin user by ID.
+    
+    Accepts image files (JPEG, PNG, GIF, WebP, SVG, AVIF, JXL) up to 10MB.
+    Replaces any existing profile picture.
+    """
+    result = await upload_admin_profile_picture(db=db, user_id=user_id, file=file)
 
     if isinstance(result, JSONResponse):
         return result

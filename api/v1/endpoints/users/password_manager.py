@@ -2,7 +2,7 @@
 User password management endpoints.
 """
 
-from fastapi import APIRouter, Depends, status, Form, Request
+from fastapi import APIRouter, Depends, status, Form, Request, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
@@ -15,6 +15,8 @@ from schemas.register import (
     UserForgotPasswordResponse,
     UserResetPasswordRequest,
     UserResetPasswordResponse,
+    UserChangePasswordRequest,
+    UserChangePasswordResponse,
 )
 from services.user_password_reset import (
     get_user_by_email,
@@ -172,12 +174,11 @@ async def reset_password_with_token(
     )
 
 
-@router.post("/change-password", status_code=status.HTTP_200_OK)
+@router.post("/update-password", status_code=status.HTTP_200_OK)
 @exception_handler
-async def change_password(
-    user_id: str = Form(...),
-    current_password: str = Form(...),
-    new_password: str = Form(...),
+async def update_password(
+    user_id: str = Query(..., description="User ID to change password for"),
+    request_data: UserChangePasswordRequest = ...,
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Change password for an authenticated user (requires current password)"""
@@ -215,15 +216,15 @@ async def change_password(
         )
     
     # Step 4: Verify current password
-    if not verify_password(current_password, user.password_hash):
+    if not verify_password(request_data.current_password, user.password_hash):
         return api_response(
             status_code=status.HTTP_401_UNAUTHORIZED,
             message="Current password is incorrect.",
             log_error=True,
         )
     
-    # Step 5: Validate new password format
-    validation_result = validate_password(new_password)
+    # Step 5: Validate new password format (already validated by schema, but keeping for extra validation)
+    validation_result = validate_password(request_data.new_password)
     if validation_result["status_code"] != 200:
         return api_response(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -231,14 +232,14 @@ async def change_password(
         )
     
     # Step 6: Prevent using the same password
-    if verify_password(new_password, user.password_hash):
+    if verify_password(request_data.new_password, user.password_hash):
         return api_response(
             status_code=status.HTTP_409_CONFLICT,
             message="New password cannot be the same as current password.",
         )
     
     # Step 7: Update the password
-    user.password_hash = hash_password(new_password)
+    user.password_hash = hash_password(request_data.new_password)
     user.failed_logins = 0  # Reset failed login attempts
     user.account_locked_at = None  # Clear lock timestamp if any
     

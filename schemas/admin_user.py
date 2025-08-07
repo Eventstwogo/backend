@@ -203,8 +203,56 @@ class AdminLoginResponse(BaseModel):
 
 
 class UpdatePasswordBody(BaseModel):
-    old_password: str
-    new_password: str = Field(min_length=8)
+    old_password: str = Field(
+        ...,
+        min_length=1,
+        title="Current Password",
+        description="Admin's current password for verification.",
+    )
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        max_length=12,
+        title="New Password",
+        description="New password (8-12 characters with uppercase, lowercase, digit, and special character).",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_fields(cls, values):
+        """Validate required fields."""
+        required_fields = ["old_password", "new_password"]
+        for field in required_fields:
+            if not values.get(field):
+                raise ValueError(f"{field.replace('_', ' ').title()} is required.")
+        return values
+
+    @field_validator("old_password")
+    @classmethod
+    def validate_old_password(cls, v):
+        """Validate current password."""
+        v = normalize_whitespace(v)
+        if not v:
+            raise ValueError("Current password cannot be empty.")
+        return v
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v):
+        """Validate password strength."""
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if len(v) > 12:
+            raise ValueError("Password must be at most 12 characters long.")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must include at least one uppercase letter.")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must include at least one lowercase letter.")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must include at least one digit.")
+        if not re.search(r"[^\w\s]", v):
+            raise ValueError("Password must include at least one special character.")
+        return v
 
 class UpdatePasswordResponse(BaseModel):
     message: str    
@@ -393,3 +441,19 @@ class AdminDeleteResponse(BaseModel):
 class AdminRestoreResponse(BaseModel):
     user_id: str
     message: str
+
+
+class AdminProfilePictureUploadResponse(BaseModel):
+    user_id: str
+    profile_picture_url: str
+    message: str
+
+
+class AdminUserDetailResponse(BaseModel):
+    user_id: str
+    username: str
+    email: EmailStr
+    role_id: str
+    role_name: str
+    profile_picture_url: Optional[str] = None
+    is_active: bool

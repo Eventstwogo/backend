@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 class VendorCategoryInfo(BaseModel):
@@ -57,3 +57,20 @@ class VendorProductsAndCategoriesResponse(BaseModel):
     products: List[VendorProductInfo] = []
     total_products: int = 0
     category_management: List[VendorCategoryManagementInfo] = []
+
+class VendorProfilePictureUploadResponse(BaseModel):
+    """Response schema for vendor profile picture upload"""
+    user_id: str
+    profile_picture_url: str
+    message: str
+
+
+class VendorUserDetailResponse(BaseModel):
+    """Response schema for vendor user profile details"""
+    user_id: str
+    username: str
+    email: EmailStr
+    store_name: Optional[str] = None
+    role_id: Optional[str] = None
+    role: Optional[str] = None
+    profile_picture_url: Optional[str] = None
