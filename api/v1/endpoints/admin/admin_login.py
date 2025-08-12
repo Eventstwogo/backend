@@ -4,7 +4,7 @@ from sqlalchemy import select
 from datetime import datetime
 from passlib.context import CryptContext
 
-from utils.id_generators import hash_data, decrypt_data
+from utils.id_generators import hash_data
 from db.models.superadmin import AdminUser, Config
 from schemas.admin_user import AdminLoginRequest, AdminLoginResponse
 from db.sessions.database import get_db
@@ -47,23 +47,17 @@ async def login_user(
         raise HTTPException(status_code=403, detail="Initial login detected. Please change your password.")
 
     if user.is_active:
-        raise HTTPException(status_code=403, detail="Account is not active")
+        raise HTTPException(status_code=403, detail="Account is in inactive state")
 
     # Reset attempts, update login time, set to active
     user.login_attempts = user.login_attempts + 1 if user.login_attempts is not None else 0
     user.login_status = 0  # Set to active
     user.last_login = datetime.utcnow()
     await db.commit()
-
-    # Decrypt email and username for token
-    decrypted_email = decrypt_data(user.email)
-    decrypted_username = decrypt_data(user.username)
     
     # Create JWT token
     token_data = {
         "sub": user.user_id,
-        "email": decrypted_email,
-        "username": decrypted_username,
         "role_id": user.role_id,
     }
     access_token = create_access_token(data=token_data)

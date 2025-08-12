@@ -69,7 +69,7 @@ async def vendor_onboarding(
             return JSONResponse(status_code=400, content={"message": "Industry is inactive."})
 
         # Clean and normalize store name
-        store_name_cleaned = ' '.join(data.store_name.strip().split())  # Remove extra spaces between words
+        store_name_cleaned = ' '.join(data.store_name.strip().split()).title()  # Remove extra spaces between words and convert to title case
         
         # Validate store name uniqueness
         store_name_check_stmt = select(BusinessProfile).where(

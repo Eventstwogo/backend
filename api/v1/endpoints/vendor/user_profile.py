@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/{user_id}/vendor-profile-details",
+    "/vendor-profile-details/{user_id}",
     response_model=VendorUserDetailResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -43,7 +43,7 @@ async def vendor_profile_details(
 
 
 @router.post(
-    "/{user_id}/profile-picture",
+    "/profile-picture/{user_id}",
     response_model=VendorProfilePictureUploadResponse,
     status_code=status.HTTP_200_OK,
 )

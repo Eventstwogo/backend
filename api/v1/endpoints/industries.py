@@ -232,7 +232,7 @@ async def update_industry(
     )
 
 
-@router.patch("/{industry_id}/status", summary="Update industry status")
+@router.patch("/status/{industry_id}", summary="Update industry status")
 @exception_handler
 async def update_industry_status(
     industry_id: str,

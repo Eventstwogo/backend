@@ -171,7 +171,7 @@ async def update_user(
 
 
 @router.patch(
-    "/{user_id}/soft-delete",
+    "/soft-delete/{user_id}",
     response_model=UserDeleteResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -220,7 +220,7 @@ async def soft_delete_user(
 
 
 @router.patch(
-    "/{user_id}/restore",
+    "/restore/{user_id}",
     response_model=UserRestoreResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -269,7 +269,7 @@ async def restore_user(
 
 
 @router.delete(
-    "/{user_id}/hard-delete",
+    "/hard-delete/{user_id}",
     response_model=UserDeleteResponse,
     status_code=status.HTTP_200_OK,
 )

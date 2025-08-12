@@ -189,7 +189,7 @@ async def update_role(
     )
 
 
-@router.patch("/{role_id}/status", summary="Update role status")
+@router.patch("/status/{role_id}", summary="Update role status")
 @exception_handler
 async def update_role_status(
     role_id: str,

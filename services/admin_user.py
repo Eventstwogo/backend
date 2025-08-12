@@ -453,7 +453,9 @@ async def update_admin_user(
         update_values = {"updated_at": datetime.now(timezone.utc)}
         
         if update_data.username:
-            update_values["username"] = encrypt_data(update_data.username)
+            # Capitalize first letter of username
+            capitalized_username = update_data.username.strip().capitalize()
+            update_values["username"] = encrypt_data(capitalized_username)
         
         if update_data.email:
             normalized_email = update_data.email.lower()
