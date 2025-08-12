@@ -192,8 +192,8 @@ async def get_query_stats_service(db: AsyncSession, user_id: str) -> Dict | JSON
             "my_queries": total_queries,  # For vendors, all queries are their own
             "assigned_to_me": 0,  # Vendors don't get assigned queries
         }
-        
-    elif user_role == "admin":
+
+    elif user_role in ["admin", "superadmin"]:
         # Admin can see all queries
         total_result = await db.execute(base_query)
         total_queries = total_result.scalar() or 0
