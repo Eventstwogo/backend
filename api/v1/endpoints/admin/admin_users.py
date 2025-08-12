@@ -82,7 +82,7 @@ async def get_admin_users(
 
 
 @router.get(
-    "/{user_id}/admin-profile-details",
+    "/admin-profile-details/{user_id}",
     response_model=AdminUserDetailResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -138,7 +138,7 @@ async def update_admin_user_by_id(
 
 
 @router.post(
-    "/{user_id}/profile-picture",
+    "/profile-picture/{user_id}",
     response_model=AdminProfilePictureUploadResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -167,7 +167,7 @@ async def upload_admin_profile_picture_by_id(
 
 
 @router.delete(
-    "/{user_id}/soft",
+    "/soft/{user_id}",
     response_model=AdminDeleteResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -195,7 +195,7 @@ async def soft_delete_admin_user_by_id(
 
 
 @router.post(
-    "/{user_id}/restore",
+    "/restore/{user_id}",
     response_model=AdminRestoreResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -222,7 +222,7 @@ async def restore_admin_user_by_id(
 
 
 @router.delete(
-    "/{user_id}/hard",
+    "/hard/{user_id}",
     response_model=AdminDeleteResponse,
     status_code=status.HTTP_200_OK,
 )

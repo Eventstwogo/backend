@@ -1008,7 +1008,7 @@ async def update_product_by_slug(
     )
 
 
-@router.put("/slug/{slug}/delete", response_model=Dict)
+@router.put("/slug/delete/{slug}", response_model=Dict)
 async def soft_delete_product_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Product).filter(Product.slug == slug))
     product = result.scalars().first()
@@ -1027,7 +1027,7 @@ async def soft_delete_product_by_slug(slug: str, db: AsyncSession = Depends(get_
 
 
 
-@router.put("/{product_id}/delete", response_model=Dict)
+@router.put("/delete/{product_id}", response_model=Dict)
 async def soft_delete_product(product_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Product).filter(Product.product_id == product_id))
     product = result.scalars().first()
@@ -1045,7 +1045,7 @@ async def soft_delete_product(product_id: str, db: AsyncSession = Depends(get_db
     return {"message": f"Product {product_id} soft deleted successfully"}
 
 
-@router.put("/{product_id}/restore", response_model=Dict)
+@router.put("/restore/{product_id}", response_model=Dict)
 async def restore_product(product_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Product).filter(Product.product_id == product_id))
     product = result.scalars().first()
@@ -1063,7 +1063,7 @@ async def restore_product(product_id: str, db: AsyncSession = Depends(get_db)):
     return {"message": f"Product {product_id} restored successfully"}
 
 
-@router.put("/slug/{slug}/restore", response_model=Dict)
+@router.put("/slug/restore/{slug}", response_model=Dict)
 async def restore_product(slug: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Product).filter(Product.slug == slug))
     product = result.scalars().first()

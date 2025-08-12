@@ -414,7 +414,7 @@ async def update_vendor_employee_by_id(
     )
 
 
-@router.patch("/{user_id}/soft-delete")
+@router.patch("/soft-delete/{user_id}")
 @exception_handler
 async def soft_delete_vendor_employee_by_id(
     user_id: str,
@@ -454,7 +454,7 @@ async def soft_delete_vendor_employee_by_id(
     )
 
 
-@router.delete("/{user_id}/hard-delete")
+@router.delete("/hard-delete/{user_id}")
 @exception_handler
 async def hard_delete_vendor_employee_by_id(
     user_id: str,
@@ -488,7 +488,7 @@ async def hard_delete_vendor_employee_by_id(
     )
 
 
-@router.patch("/{user_id}/restore")
+@router.patch("/restore/{user_id}")
 @exception_handler
 async def restore_vendor_employee_by_id(
     user_id: str,

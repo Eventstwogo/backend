@@ -23,7 +23,7 @@ from services.admin_user import (
 from services.admin_password_service import generate_and_send_admin_credentials
 from utils.exception_handlers import exception_handler
 from utils.file_uploads import get_media_url
-from utils.id_generators import encrypt_data, generate_lower_uppercase, hash_data
+from utils.id_generators import encrypt_data, generate_lower_uppercase, hash_data, decrypt_data
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -54,7 +54,9 @@ async def create_admin_user(
             )
         
         # Check if username already exists (need to check encrypted usernames)
-        encrypted_username = encrypt_data(admin_data.username)
+        # Capitalize first letter of username
+        capitalized_username = admin_data.username.strip().capitalize()
+        encrypted_username = encrypt_data(capitalized_username)
         existing_username_stmt = select(AdminUser).where(AdminUser.username == encrypted_username)
         existing_username_result = await db.execute(existing_username_stmt)
         existing_username_user = existing_username_result.scalar_one_or_none()
@@ -116,7 +118,7 @@ async def create_admin_user(
         try:
             email_sent = send_admin_welcome_email(
                 email=normalized_email,  # Use normalized email for sending
-                username=admin_data.username,
+                username=capitalized_username,
                 password=admin_data.password,  # Send the plain password in email
             )
         except Exception as e:
@@ -125,7 +127,7 @@ async def create_admin_user(
         
         return AdminCreateResponse(
             user_id=user_id,
-            username=admin_data.username,
+            username=capitalized_username,
             email=normalized_email,  # Return normalized email
             role_id=superadmin_role.role_id,
             message="Admin user created successfully" + (" and welcome email sent" if email_sent else " but email sending failed"),
@@ -156,7 +158,9 @@ async def register_user(
     # Convert email to lowercase for case-insensitive storage and comparison
     normalized_email = user_data.email.strip().lower()
     
-    encrypted_username = encrypt_data(user_data.username)
+    # Capitalize first letter of username
+    capitalized_username = user_data.username.strip().capitalize()
+    encrypted_username = encrypt_data(capitalized_username)
     encrypted_email = encrypt_data(normalized_email)
 
     # Check if encrypted data length is within database limits
@@ -177,9 +181,36 @@ async def register_user(
     email_hash = hash_data(normalized_email)
 
     # Check if user already exists
-    unique_user_result = await validate_unique_user(db, email_hash)
-    if unique_user_result is not None:
-        return unique_user_result
+    existing_user_stmt = select(AdminUser).where(AdminUser.email_hash == email_hash)
+    existing_user_result = await db.execute(existing_user_stmt)
+    existing_user = existing_user_result.scalar_one_or_none()
+    
+    if existing_user:
+        # If user exists and is inactive (is_active=True means inactive), reactivate them
+        if existing_user.is_active:  # True means inactive
+            # Simply reactivate the user
+            existing_user.is_active = False  # False means active
+            
+            await db.commit()
+            await db.refresh(existing_user)
+            
+            return api_response(
+                status_code=status.HTTP_200_OK,
+                message="User reactivated successfully.",
+                data=AdminRegisterResponse(
+                    user_id=existing_user.user_id,
+                    email=normalized_email,
+                    username=decrypt_data(existing_user.username),
+                    password="",  # Don't expose existing password
+                ),
+            )
+        else:
+            # User exists and is active, return conflict error
+            return api_response(
+                status_code=status.HTTP_409_CONFLICT,
+                message="User with the given email already exists and is active.",
+                log_error=True,
+            )
 
     # Validate role
     role_result = await validate_role(db, user_data.role_id)
@@ -207,7 +238,7 @@ async def register_user(
     # Generate random password and send credentials via email
     plain_password, hashed_password, email_sent = generate_and_send_admin_credentials(
         email=normalized_email,  # Use normalized email
-        username=user_data.username,
+        username=capitalized_username,
         logo_url=logo_url
     )
     
@@ -246,7 +277,7 @@ async def register_user(
         data=AdminRegisterResponse(
             user_id=user_id,
             email=normalized_email,  # Return normalized email
-            username=user_data.username,
+            username=capitalized_username,
             password=plain_password,
         ),
     )
