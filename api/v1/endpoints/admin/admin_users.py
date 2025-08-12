@@ -247,3 +247,30 @@ async def hard_delete_admin_user_by_id(
         message=result.message,
         data=result.model_dump(),
     )
+
+
+@router.get(
+    "/{user_id}",
+    status_code=status.HTTP_200_OK,
+)
+@exception_handler
+async def get_admin_user_by_id(
+    user_id: str = Path(..., description="Admin user ID to retrieve"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """
+    Get admin user by ID. Returns username and email only.
+    """
+    result = await get_admin_user_details(db=db, user_id=user_id)
+
+    if isinstance(result, JSONResponse):
+        return result
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Admin user retrieved successfully.",
+        data={
+            "username": result.username,
+            "email": result.email,
+        },
+    )
