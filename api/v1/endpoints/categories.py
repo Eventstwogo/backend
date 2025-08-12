@@ -14,7 +14,7 @@ from slugify import slugify
 from sqlalchemy import case, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from starlette.responses import JSONResponse
 
 from core.api_response import api_response
@@ -361,18 +361,23 @@ async def get_categories_and_subcategories_by_status(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    stmt = select(Category).options(selectinload(Category.subcategories))
+    stmt = (
+        select(Category, Industries.industry_name)
+        .join(Industries, Category.industry_id == Industries.industry_id)
+        .options(selectinload(Category.subcategories))
+    )
 
     # Apply category status filter if provided
     if status_value is not None:
         stmt = stmt.where(Category.category_status.is_(status_value))
 
     result = await db.execute(stmt)
-    categories = result.scalars().unique().all()
+    category_data = result.all()
 
-    for category in categories:
+    categories = []
+    for category, industry_name in category_data:
+        # Process category name and image
         category.category_name = category.category_name.title()
-        # Process category image URL
         category.category_img_thumbnail = get_media_url(category.category_img_thumbnail)
 
         if category.category_status:
@@ -384,6 +389,26 @@ async def get_categories_and_subcategories_by_status(
             sub.subcategory_name = sub.subcategory_name.title()
             # Process subcategory image URL
             sub.subcategory_img_thumbnail = get_media_url(sub.subcategory_img_thumbnail)
+        
+        # Create a properly ordered dictionary to ensure field order
+        category_dict = {
+            "category_id": category.category_id,
+            "industry_id": category.industry_id,
+            "industry_name": industry_name,
+            "category_name": category.category_name,
+            "category_description": category.category_description,
+            "category_slug": category.category_slug,
+            "category_meta_title": category.category_meta_title,
+            "category_meta_description": category.category_meta_description,
+            "category_img_thumbnail": category.category_img_thumbnail,
+            "featured_category": category.featured_category,
+            "show_in_menu": category.show_in_menu,
+            "category_status": category.category_status,
+            "category_tstamp": category.category_tstamp,
+            "subcategories": category.subcategories,
+        }
+        
+        categories.append(category_dict)
 
     return api_response(
         status_code=status.HTTP_200_OK,
