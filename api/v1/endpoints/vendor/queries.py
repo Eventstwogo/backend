@@ -149,7 +149,7 @@ async def get_queries_list(
 
     if user_role == "vendor":
         query_stmt = query_stmt.where(VendorQuery.sender_user_id == user_id)
-    elif user_role == "admin":
+    elif user_role in ["admin", "superadmin"]:
         if filters.sender_user_id:
             query_stmt = query_stmt.where(
                 VendorQuery.sender_user_id == filters.sender_user_id
@@ -359,7 +359,7 @@ async def add_message_to_query(
                 status.HTTP_403_FORBIDDEN, "Access denied", log_error=True
             )
         sender_type = "vendor"
-    elif user_role == "admin":
+    elif user_role in ["admin", "superadmin"]:
         sender_type = "admin"
         if not query.receiver_user_id:
             query.receiver_user_id = request.user_id
@@ -452,7 +452,7 @@ async def update_query_status(
             type="response",
             sender_type=(
                 "admin"
-                if user_role == "admin"
+                if user_role in ["admin", "superadmin"]
                 else "vendor"
             ),
             user_id=request.user_id,
@@ -603,7 +603,7 @@ async def get_message_templates(
         },
     ]
     templates = (
-        admin_templates if template_type == "admin" else vendor_templates
+        admin_templates if template_type in ["admin", "superadmin"] else vendor_templates
     )
     return api_response(
         status_code=status.HTTP_200_OK,

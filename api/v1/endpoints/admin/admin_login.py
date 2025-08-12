@@ -44,7 +44,7 @@ async def login_user(
         raise HTTPException(status_code=423, detail="Account is locked. Try after 24 hours.")
     
     if user.login_status == -1:
-        raise HTTPException(status_code=403, detail="Initial login detected. Please change your password.")
+        raise HTTPException(status_code=428, detail="Initial login detected. Please change your password.")
 
     if user.is_active:
         raise HTTPException(status_code=403, detail="Account is in inactive state")

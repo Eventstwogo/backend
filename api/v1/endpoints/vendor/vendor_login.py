@@ -149,19 +149,18 @@ async def login_user(
         reviewer_comment= reviewer_comment
     )
 
-    # Decrypt email and username for token
-    try:
-        decrypted_email = decrypt_data(user.email)
-        decrypted_username = decrypt_data(user.username) if user.username != "unknown" else "unknown"
-    except Exception:
-        # Fallback to encrypted values if decryption fails
-        decrypted_email = user.email
-        decrypted_username = user.username if user.username != "unknown" else "unknown"
+    # # Decrypt email and username for token
+    # try:
+    #     decrypted_email = decrypt_data(user.email)
+    #     decrypted_username = decrypt_data(user.username) if user.username != "unknown" else "unknown"
+    # except Exception:
+    #     # Fallback to encrypted values if decryption fails
+    #     decrypted_email = user.email
+    #     decrypted_username = user.username if user.username != "unknown" else "unknown"
 
     token_data = {
-        "userId": user.user_id,
-        "email": decrypted_email,
-        "username": decrypted_username
+        "uid": user.user_id,
+        "rid": user.role,
     }
 
     access_token = create_access_token(data=token_data)
