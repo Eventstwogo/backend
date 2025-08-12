@@ -78,7 +78,7 @@ def validate_category_data(
         description = sanitize_input(description).strip()
         description = normalize_whitespace(description)
         # Allow more characters in description: letters, numbers, spaces, periods, commas, hyphens, parentheses, etc.
-        if not re.fullmatch(r"[A-Za-z0-9\s.,()&'\"!?:;-]+", description):
+        if not re.fullmatch(r"[A-Za-z0-9\s.,()&'’\"!?:;-–]+", description):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Description contains invalid characters.",
@@ -105,7 +105,7 @@ def validate_category_data(
         meta_title = sanitize_input(meta_title).strip()
         meta_title = normalize_whitespace(meta_title)
         # Allow more characters in meta title: letters, numbers, spaces, periods, commas, hyphens, pipes, etc.
-        if not re.fullmatch(r"[A-Za-z0-9\s.,()&'\"!?:;|-]+", meta_title):
+        if not re.fullmatch(r"[A-Za-z0-9\s.,’()&'\"!?:;|-–]+", meta_title):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Meta title contains invalid characters.",
@@ -132,7 +132,7 @@ def validate_category_data(
         meta_description = sanitize_input(meta_description).strip()
         meta_description = normalize_whitespace(meta_description)
         # Allow more characters in meta description: letters, numbers, spaces, periods, commas, hyphens, etc.
-        if not re.fullmatch(r"[A-Za-z0-9\s.,()&'\"!?:;-]+", meta_description):
+        if not re.fullmatch(r"[A-Za-z0-9\s.,()&'’\"!?:;-–]+", meta_description):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Meta description contains invalid characters.",

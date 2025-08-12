@@ -61,7 +61,7 @@ async def create_industry(
             existing.is_active = False
             existing.industry_name = industry.industry_name  # Already processed by schema
             existing.industry_slug = industry.industry_slug  # Already processed by schema
-            existing.timestamp = datetime.now(timezone.utc)
+            existing.timestamp = datetime.now()
             await db.commit()
             await db.refresh(existing)
             return api_response(
