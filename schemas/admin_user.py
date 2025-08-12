@@ -183,6 +183,10 @@ class PaginatedAdminListResponse(BaseModel):
     admins: List[AdminUser]
 
 
+class AdminListResponse(BaseModel):
+    admins: List[AdminUser]
+
+
 class AdminLoginRequest(BaseModel):
     email: str = Field(..., description="Username or email (case-insensitive)")
     password: str = Field(..., description="User password")

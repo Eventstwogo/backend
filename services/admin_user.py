@@ -14,6 +14,7 @@ from schemas.admin_user import (
     AdminUser as AdminUserSchema,
     AdminUserDetailResponse, 
     PaginatedAdminListResponse,
+    AdminListResponse,
     AdminUpdateRequest,
     AdminUpdateResponse,
     AdminDeleteResponse,
@@ -207,32 +208,24 @@ async def get_all_admin_users(
         count_query = select(func.count(AdminUser.user_id))
         
         # Apply filters
-        conditions = [AdminUser.is_active == False]  # Only show active users (is_active=False means active)
+        conditions = []
         
-        if search:
-            # Since username and email are encrypted, we need to search differently
-            # For now, we'll get all users and filter in Python (not ideal for large datasets)
-            # In production, you might want to add a searchable field or use full-text search
-            pass  # We'll handle search after fetching
-            
         if role_id:
             conditions.append(AdminUser.role_id == role_id)
             
         if is_active is not None:
             conditions.append(AdminUser.is_active == is_active)
         
-        # Always apply conditions (at minimum, exclude soft deleted users)
-        query = query.where(and_(*conditions))
-        count_query = count_query.where(and_(*conditions))
-        
-        # Get total count
-        total_result = await db.execute(count_query)
-        total = total_result.scalar()
+        # Apply conditions only if any exist
+        if conditions:
+            query = query.where(and_(*conditions))
+            count_query = count_query.where(and_(*conditions))
         
         # If search is provided, we need to handle it differently due to encryption
         if search:
-            # Get all matching users first (without pagination)
-            all_users_result = await db.execute(query)
+            # Get all matching users first (without pagination) for search
+            search_query = query
+            all_users_result = await db.execute(search_query)
             all_users = all_users_result.scalars().all()
             
             # Filter by search term after decryption
@@ -256,6 +249,10 @@ async def get_all_admin_users(
             # Apply pagination to filtered results
             users = filtered_users[offset:offset + per_page]
         else:
+            # Get total count first
+            total_result = await db.execute(count_query)
+            total = total_result.scalar()
+            
             # Apply pagination to query
             query = query.offset(offset).limit(per_page).order_by(AdminUser.created_at.desc())
             
@@ -291,6 +288,61 @@ async def get_all_admin_users(
             per_page=per_page,
             admins=admin_users,
         )
+        
+    except Exception as e:
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to retrieve admin users: {str(e)}",
+            log_error=True,
+        )
+
+
+async def get_all_admin_users_excluding_superadmin(
+    db: AsyncSession,
+) -> JSONResponse | AdminListResponse:
+    """Get all admin users excluding superadmin users"""
+    try:
+        # Build query to get all admin users with their roles
+        query = select(AdminUser).options(selectinload(AdminUser.role))
+        
+        # Execute query to get all users
+        result = await db.execute(query)
+        all_users = result.scalars().all()
+        
+        # Filter out superadmin users
+        filtered_users = []
+        for user in all_users:
+            try:
+                # Check if user's role is not superadmin
+                if user.role and user.role.role_name.lower() not in {"superadmin", "super admin"}:
+                    filtered_users.append(user)
+            except Exception:
+                # Skip users with issues
+                continue
+        
+        # Convert to response schema
+        admin_users = []
+        for user in filtered_users:
+            try:
+                # Decrypt sensitive data
+                decrypted_username = decrypt_data(user.username)
+                decrypted_email = decrypt_data(user.email)
+                
+                admin_user = AdminUserSchema(
+                    user_id=user.user_id,
+                    username=decrypted_username,
+                    email=decrypted_email,
+                    role_id=user.role_id,
+                    created_at=user.created_at,
+                    is_active=user.is_active,
+                )
+                admin_users.append(admin_user)
+            except Exception as e:
+                # Log the error but continue with other users
+                print(f"Error decrypting user data for user_id {user.user_id}: {e}")
+                continue
+        
+        return AdminListResponse(admins=admin_users)
         
     except Exception as e:
         return api_response(

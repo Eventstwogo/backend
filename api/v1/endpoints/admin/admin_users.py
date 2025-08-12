@@ -6,6 +6,7 @@ from core.api_response import api_response
 from db.sessions.database import get_db
 from schemas.admin_user import (
     PaginatedAdminListResponse,
+    AdminListResponse,
     AdminUpdateRequest,
     AdminUpdateResponse,
     AdminDeleteResponse,
@@ -15,6 +16,7 @@ from schemas.admin_user import (
 )
 from services.admin_user import (
     get_all_admin_users,
+    get_all_admin_users_excluding_superadmin,
     update_admin_user,
     soft_delete_admin_user,
     restore_admin_user,
@@ -58,7 +60,7 @@ router = APIRouter()
 
 @router.get(
     "/",
-    response_model=PaginatedAdminListResponse,
+    response_model=AdminListResponse,
     status_code=status.HTTP_200_OK,
 )
 @exception_handler
@@ -66,10 +68,10 @@ async def get_admin_users(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
-    Get all admin users.
+    Get all admin users excluding superadmin users.
     """
 
-    result = await get_all_admin_users(db=db)
+    result = await get_all_admin_users_excluding_superadmin(db=db)
 
     if isinstance(result, JSONResponse):
         return result
@@ -77,7 +79,7 @@ async def get_admin_users(
     return api_response(
         status_code=status.HTTP_200_OK,
         message="Admin users retrieved successfully.",
-        data=result,
+        data=result.model_dump(),
     )
 
 
