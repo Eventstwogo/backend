@@ -203,7 +203,6 @@ class AdminUserInfo(BaseModel):
 class AdminLoginResponse(BaseModel):
     access_token: str
     message: str
-    user: Optional[AdminUserInfo] = None
 
 
 class UpdatePasswordBody(BaseModel):
