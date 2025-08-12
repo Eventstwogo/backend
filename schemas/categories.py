@@ -24,6 +24,7 @@ class SubCategoryOut(BaseModel):
 class CategoryOut(BaseModel):
     category_id: str
     industry_id: str
+    industry_name: Optional[str] = None
     category_name: str
     category_description: Optional[str]
     category_slug: str
