@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class VendorCategoryInfo(BaseModel):
@@ -80,3 +80,22 @@ class VendorUserDetailResponse(BaseModel):
     role: Optional[str] = None
     profile_picture_url: Optional[str] = None
     join_date: Optional[str] = None  # Format: dd-mm-yyyy
+
+
+class VendorLoginRequest(BaseModel):
+    email: str = Field(..., description="Username or email (case-insensitive)")
+    password: str = Field(..., description="User password")
+
+
+class VendorUserInfo(BaseModel):
+    is_approved: int
+    ref_number: str
+    industry: str
+    onboarding_status: str 
+    vendor_store_slug: str 
+    reviewer_comment: str
+
+class VendorLoginResponse(BaseModel):
+    access_token: str
+    message: str
+    user: VendorUserInfo | None = None

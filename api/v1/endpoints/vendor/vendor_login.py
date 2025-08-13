@@ -5,9 +5,9 @@ from sqlalchemy import select
 from datetime import datetime
 from passlib.context import CryptContext
 
+from schemas.vendor_details import VendorLoginRequest, VendorLoginResponse, VendorUserInfo
 from utils.id_generators import hash_data, decrypt_data
 from db.models.superadmin import BusinessProfile, VendorLogin, VendorSignup
-from schemas.admin_user import AdminLoginRequest, AdminLoginResponse, AdminUserInfo
 from db.sessions.database import get_db
 from utils.jwt import create_access_token
 from schemas.vendor_onboarding import StoreNameCheckRequest, StoreNameCheckResponse
@@ -20,9 +20,9 @@ router = APIRouter()
 MAX_LOGIN_ATTEMPTS = 5
 
 
-@router.post("/login", response_model=AdminLoginResponse)
+@router.post("/login", response_model=VendorLoginResponse)
 async def login_user(
-    login_data: AdminLoginRequest,
+    login_data: VendorLoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
     email_hash = hash_data(login_data.email)
@@ -140,7 +140,7 @@ async def login_user(
     await db.refresh(user)
 
     # Step 9: Prepare response
-    user_info = AdminUserInfo(
+    user_info = VendorUserInfo(
         is_approved=is_approved,
         ref_number=ref_number,
         industry=industry,
@@ -165,7 +165,7 @@ async def login_user(
 
     access_token = create_access_token(data=token_data)
 
-    return AdminLoginResponse(
+    return VendorLoginResponse(
         access_token=access_token,
         user=user_info,
         message="Login successful"
