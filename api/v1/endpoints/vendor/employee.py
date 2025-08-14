@@ -80,8 +80,39 @@ async def create_vendor_employee(
             message=f"This email '{employee_data.email}' is already registered for vendor signup. Please try with another email."
         )
     
+    # Check if email exists and handle inactive employees
+    encrypted_email = encrypt_data(employee_data.email)
+    email_hash = hash_data(employee_data.email)
+    email_stmt = select(VendorLogin).where(VendorLogin.email_hash == email_hash)
+    email_result = await db.execute(email_stmt)
+    existing_email = email_result.scalar_one_or_none()
+    
+    if existing_email:
+        # If email exists and employee is active, return conflict
+        if not existing_email.is_active:  # False means active
+            return api_response(
+                status_code=status.HTTP_409_CONFLICT,
+                message=f"Email '{employee_data.email}' is already registered"
+            )
+        
+        # If email exists and employee is inactive, reactivate them
+        if existing_email.is_active:  # True means inactive
+            existing_email.is_active = False  # Reactivate
+            await db.commit()
+            
+            return api_response(
+                status_code=status.HTTP_200_OK,
+                message="Vendor employee reactivated successfully",
+                data={
+                    "user_id": existing_email.user_id,
+                    "email": employee_data.email
+                }
+            )
+    
     # Check if username is unique and prepare username data
-    encrypted_username = encrypt_data(employee_data.username)
+    # Capitalize first letter of username before saving to database
+    formatted_username = employee_data.username.capitalize()
+    encrypted_username = encrypt_data(formatted_username)
     username_hash = hash_data(employee_data.username.lower())
     
     # Check uniqueness using username_hash (more efficient)
@@ -93,19 +124,6 @@ async def create_vendor_employee(
         return api_response(
             status_code=status.HTTP_409_CONFLICT,
             message=f"Username '{employee_data.username}' is already taken"
-        )
-    
-    # Check if email is unique and prepare email data
-    encrypted_email = encrypt_data(employee_data.email)
-    email_hash = hash_data(employee_data.email)
-    email_stmt = select(VendorLogin).where(VendorLogin.email_hash == email_hash)
-    email_result = await db.execute(email_stmt)
-    existing_email = email_result.scalar_one_or_none()
-    
-    if existing_email:
-        return api_response(
-            status_code=status.HTTP_409_CONFLICT,
-            message=f"Email '{employee_data.email}' is already registered"
         )
     
     # Generate unique IDs and password
@@ -190,9 +208,9 @@ async def create_vendor_employee(
         
         email_sent = send_vendor_employee_credentials_email(
             email=employee_data.email,
-            employee_name=employee_data.username,
+            employee_name=formatted_username,
             business_name=vendor_business_name or "Your Business",
-            username=employee_data.username,
+            username=formatted_username,
             password=generated_password,
             role_name=role.role_name if role else None,
         )
@@ -210,7 +228,7 @@ async def create_vendor_employee(
         message="Vendor employee created successfully",
         data={
             "user_id": user_id,
-            "username": employee_data.username,
+            "username": formatted_username,
             "email": employee_data.email,
             "password": generated_password,
             "vendor_ref_id": vendor_id
@@ -271,6 +289,84 @@ async def get_vendor_employee_by_id(
     )
 
 
+@router.get("/vendor/{vendor_id}")
+@exception_handler
+async def get_vendor_employees_by_vendor_id(
+    vendor_id: str,
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(10, ge=1, le=100, description="Items per page"),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Get all employees for a specific vendor by vendor_id with pagination"""
+    
+    # Validate vendor_id exists in VendorLogin table
+    vendor_stmt = select(VendorLogin).where(VendorLogin.user_id == vendor_id)
+    vendor_result = await db.execute(vendor_stmt)
+    vendor = vendor_result.scalar_one_or_none()
+    
+    if not vendor:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message=f"Vendor with ID '{vendor_id}' not found"
+        )
+    
+    # Build base query with join to get role names
+    # Filter by vendor_ref_id matching the provided vendor_id
+    base_query = select(VendorLogin, Role.role_name).outerjoin(
+        Role, VendorLogin.role == Role.role_id
+    ).where(VendorLogin.vendor_ref_id == vendor_id)
+    
+    # Get total count for this vendor's employees
+    count_query = select(func.count(VendorLogin.user_id)).where(VendorLogin.vendor_ref_id == vendor_id)
+    
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+    
+    # Calculate pagination
+    total_pages = math.ceil(total / per_page)
+    offset = (page - 1) * per_page
+    
+    # Get paginated results
+    query = base_query.offset(offset).limit(per_page).order_by(VendorLogin.timestamp.desc())
+    result = await db.execute(query)
+    employees_data = result.all()
+    
+    # Format response
+    employees = []
+    for employee, role_name in employees_data:
+        try:
+            decrypted_email = decrypt_data(employee.email)
+        except Exception:
+            decrypted_email = "encrypted_email"
+        
+        # Decrypt username for response
+        decrypted_username = safe_decrypt_username(employee.username)
+        
+        employees.append({
+            "user_id": employee.user_id,
+            "username": decrypted_username,
+            "email": decrypted_email,
+            "role_id": employee.role,
+            "role_name": role_name,
+            "vendor_ref_id": employee.vendor_ref_id,
+            "is_active": employee.is_active,
+            "created_at": employee.timestamp.isoformat() if employee.timestamp else None
+        })
+    
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message=f"Employees for vendor '{vendor_id}' retrieved successfully",
+        data={
+            "vendor_id": vendor_id,
+            "employees": employees,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": total_pages
+        }
+    )
+
+
 @router.put("/{user_id}")
 @exception_handler
 async def update_vendor_employee_by_id(
@@ -326,7 +422,10 @@ async def update_vendor_employee_by_id(
         employee.role = update_data.role_id
     
     # Check username uniqueness if provided
+    formatted_username = None
     if update_data.username:
+        # Capitalize first letter of username before saving to database
+        formatted_username = update_data.username.capitalize()
         username_hash = hash_data(update_data.username.lower())
         
         # Check uniqueness using username_hash (excluding current user)
@@ -345,7 +444,7 @@ async def update_vendor_employee_by_id(
                 message=f"Username '{update_data.username}' is already taken"
             )
         
-        encrypted_username = encrypt_data(update_data.username)
+        encrypted_username = encrypt_data(formatted_username)
         employee.username = encrypted_username
         employee.username_hash = username_hash
     
@@ -378,7 +477,7 @@ async def update_vendor_employee_by_id(
         if existing_login_email:
             return api_response(
                 status_code=status.HTTP_409_CONFLICT,
-                message="This email already registered for vendor"
+                message="This email already registered for vendor employee"
             )
         
         employee.email = encrypted_email
@@ -398,7 +497,7 @@ async def update_vendor_employee_by_id(
         current_email = update_data.email if update_data.email else "encrypted_email"
     
     # Get current username for response
-    current_username = safe_decrypt_username(employee.username, update_data.username if update_data.username else "updated_username")
+    current_username = safe_decrypt_username(employee.username, formatted_username if update_data.username else "updated_username")
     
     return api_response(
         status_code=status.HTTP_200_OK,

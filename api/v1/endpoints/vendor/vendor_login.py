@@ -32,11 +32,11 @@ async def login_user(
     signup_result = await db.execute(signup_stmt)
     signup_user = signup_result.scalar_one_or_none()
 
-    if signup_user and not signup_user.email_flag:
-        raise HTTPException(
-            status_code=401,
-            detail="Please verify your email address before logging in."
-        )
+    # if signup_user and not signup_user.email_flag:
+    #     raise HTTPException(
+    #         status_code=401,
+    #         detail="Please verify your email address before logging in."
+    #     )
 
     # Step 2: VendorLogin lookup
     stmt = select(VendorLogin).where(VendorLogin.email_hash == email_hash)

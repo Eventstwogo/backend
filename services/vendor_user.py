@@ -7,7 +7,7 @@ from starlette.responses import JSONResponse
 
 from core.api_response import api_response
 from db.models.superadmin import Category, Config, VendorSignup, VendorLogin, BusinessProfile, Role
-from schemas.vendor_details import VendorProfilePictureUploadResponse, VendorUserDetailResponse
+from schemas.vendor_details import VendorProfilePictureUploadResponse, VendorUserDetailResponse, VendorBannerUploadResponse, VendorBannerResponse
 from utils.file_uploads import get_media_url
 from utils.id_generators import decrypt_data
 
@@ -241,5 +241,173 @@ async def get_vendor_user_details(
         return api_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=f"Failed to retrieve vendor user details: {str(e)}",
+            log_error=True,
+        )
+
+
+async def upload_vendor_banner_image(
+    db: AsyncSession, 
+    user_id: str, 
+    file: UploadFile
+) -> JSONResponse | VendorBannerUploadResponse:
+    """
+    Upload banner image for a vendor business by user ID.
+    """
+    from utils.file_uploads import save_uploaded_file, get_media_url, remove_file_if_exists
+    from core.config import settings
+    
+    # Get the vendor user
+    user = await get_vendor_user_by_id(db, user_id)
+    if isinstance(user, JSONResponse):
+        return user
+    
+    # # Check username - only vendors (username="unknown") can upload banner images
+    # if user.username != "unknown":
+    #     return api_response(
+    #         status_code=status.HTTP_403_FORBIDDEN,
+    #         message="Vendor employee does not have access to upload banner images.",
+    #         log_error=True,
+    #     )
+    
+    # Check if user has a business profile
+    if not user.business_profile_id:
+        return api_response(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Vendor does not have a business profile. Only business owners can upload banner images.",
+            log_error=True,
+        )
+    
+    # Get the business profile
+    business_result = await db.execute(
+        select(BusinessProfile).where(BusinessProfile.profile_ref_id == user.business_profile_id)
+    )
+    business_profile = business_result.scalar_one_or_none()
+    
+    if not business_profile:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="Business profile not found.",
+            log_error=True,
+        )
+    
+    try:
+        # Remove old banner image if exists
+        if business_profile.business_logo:
+            remove_file_if_exists(business_profile.business_logo)
+        
+        # Upload new banner image
+        upload_path = settings.VENDOR_BANNER_UPLOAD_PATH.format(business_id=business_profile.profile_ref_id)
+        relative_path = await save_uploaded_file(file, upload_path)
+        
+        # Update business_logo column in database
+        business_profile.business_logo = relative_path
+        await db.commit()
+        
+        # Get the full URL for response
+        banner_image_url = get_media_url(relative_path)
+        
+        return VendorBannerUploadResponse(
+            banner_image_url=banner_image_url
+        )
+        
+    except Exception as e:
+        await db.rollback()
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Banner image upload error: {error_details}")  # For debugging
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to upload banner image: {str(e)}",
+            log_error=True,
+        )
+
+
+async def get_vendor_banner_image(
+    db: AsyncSession, 
+    user_id: str
+) -> JSONResponse | VendorBannerResponse:
+    """
+    Get banner image for a vendor business by user ID.
+    Supports both vendor owners and employees.
+    - If user is a vendor owner (has business_profile_id), show their banner
+    - If user is a vendor employee (has vendor_ref_id), show their vendor's banner
+    """
+    
+    # Get the vendor user
+    user = await get_vendor_user_by_id(db, user_id)
+    if isinstance(user, JSONResponse):
+        return user
+    
+    business_profile = None
+    
+    # Case 1: User is a vendor owner (has business_profile_id)
+    if user.business_profile_id:
+        # Get the business profile directly
+        business_result = await db.execute(
+            select(BusinessProfile).where(BusinessProfile.profile_ref_id == user.business_profile_id)
+        )
+        business_profile = business_result.scalar_one_or_none()
+    
+    # Case 2: User is a vendor employee OR vendor owner without valid business profile
+    # (has vendor_ref_id and either no business_profile_id or business_profile not found)
+    if not business_profile and user.vendor_ref_id and user.vendor_ref_id != "unknown":
+        # Find the main vendor by vendor_ref_id
+        main_vendor_result = await db.execute(
+            select(VendorLogin).where(VendorLogin.user_id == user.vendor_ref_id)
+        )
+        main_vendor = main_vendor_result.scalar_one_or_none()
+        
+        if not main_vendor:
+            return api_response(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message="Main vendor not found for this employee.",
+                log_error=True,
+            )
+        
+        if not main_vendor.business_profile_id:
+            return api_response(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message="Main vendor does not have a business profile.",
+                log_error=True,
+            )
+        
+        # Get the main vendor's business profile
+        business_result = await db.execute(
+            select(BusinessProfile).where(BusinessProfile.profile_ref_id == main_vendor.business_profile_id)
+        )
+        business_profile = business_result.scalar_one_or_none()
+        
+        if not business_profile:
+            return api_response(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message="Main vendor's business profile not found.",
+                log_error=True,
+            )
+    
+    # Case 3: No business profile found after checking all possibilities
+    if not business_profile:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="No business profile found. User must be a business owner with a valid profile or an employee of a business owner.",
+            log_error=True,
+        )
+    
+    try:
+        # Get banner image URL from business_logo column
+        banner_image_url = None
+        if business_profile.business_logo:
+            banner_image_url = get_media_url(business_profile.business_logo)
+        
+        return VendorBannerResponse(
+            banner_image_url=banner_image_url
+        )
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Get vendor banner image error: {error_details}")  # For debugging
+        return api_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to retrieve vendor banner image: {str(e)}",
             log_error=True,
         )

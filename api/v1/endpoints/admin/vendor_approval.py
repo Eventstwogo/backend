@@ -129,7 +129,7 @@ async def reject_vendor(
 
 
 @router.post("/vendor/onhold", response_model=dict)
-async def reject_vendor(
+async def reject_onhold(
     user_id: str,
     db: AsyncSession = Depends(get_db),
 ):
@@ -159,7 +159,7 @@ async def reject_vendor(
     db.add_all([vendor, business_profile])
     await db.commit()
 
-    return {"message": f"Vendor rejected successfully"}
+    return {"message": f"Vendor onholded successfully"}
 
 
 

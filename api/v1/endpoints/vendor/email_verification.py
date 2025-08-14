@@ -252,9 +252,6 @@ async def resend_verification_email(
     await db.commit()
     await db.refresh(user)
    
-    # Create verification link with both email and token (URL encoded)
-    verification_link = f"{settings.VENDOR_FRONTEND_URL}/emailconfirmation?token={new_email_token}&email={quote(request.email)}"
-   
     # Send verification email in background
     background_tasks.add_task(
         send_vendor_verification_email,

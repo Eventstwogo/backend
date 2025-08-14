@@ -84,9 +84,6 @@ async def register_user(
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
-
-    # Create verification link with both email and token (URL encoded)
-    verification_link = f"{settings.VENDOR_FRONTEND_URL}/emailconfirmation?token={email_token}&email={quote(user_data.email)}"
     
     # Send vendor verification email instead of welcome email
     background_tasks.add_task(

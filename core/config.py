@@ -172,6 +172,7 @@ class Settings(BaseSettings):
     EVENT_CARD_IMAGE_UPLOAD_PATH: str = "events/{event_id}/card_image"
     EVENT_BANNER_IMAGE_UPLOAD_PATH: str = "events/{event_id}/banner_image"
     EVENT_EXTRA_IMAGES_UPLOAD_PATH: str = "events/{event_id}/extra_images"
+    VENDOR_BANNER_UPLOAD_PATH: str = "vendors/{business_id}/banner"
 
     # === JWT ===
     JWT_ALGORITHM: str = "RS256"
