@@ -661,11 +661,11 @@ async def get_products_by_vendor_id(
         )
         products_data = result.all()
 
-        if not products_data:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No products found for vendor ID: {vendor_id}"
-            )
+        # if not products_data:
+        #     raise HTTPException(
+        #         status_code=404,
+        #         detail=f"No products found for vendor ID: {vendor_id}"
+        #     )
 
         # Map products into the correct response model
         response = []
@@ -677,6 +677,7 @@ async def get_products_by_vendor_id(
             response.append(
                 ProductResponse(
                     product_id=product.product_id,
+                    banner_image=get_media_url(business_profile.business_logo) if business_profile else None,
                     store_name=business_profile.store_name if business_profile else None,
                     slug=product.slug,
                     identification=product.identification,

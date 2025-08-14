@@ -79,6 +79,7 @@ class ProductCreate(BaseModel):
 
 class ProductResponse(BaseModel):
     product_id: str
+    banner_image: Optional[str]
     store_name: Optional[str]
     slug: str
     identification: Dict[str, Any]

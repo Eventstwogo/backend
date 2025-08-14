@@ -50,11 +50,11 @@ async def login_user(
                     status_code=401,
                     detail="Please verify your email first before logging in."
                 )
-            else:
-                raise HTTPException(
-                    status_code=422,
-                    detail="Account verification incomplete. Please contact support."
-                )
+            # else:
+            #     raise HTTPException(
+            #         status_code=422,
+            #         detail="Account verification incomplete. Please contact support."
+                # )
         else:
             raise HTTPException(
                 status_code=404,
@@ -84,14 +84,14 @@ async def login_user(
         await db.commit()
         remaining = MAX_LOGIN_ATTEMPTS - user.login_failed_attempts
         raise HTTPException(
-            status_code=401,
+            status_code=400,
             detail=f"Incorrect password. {remaining} attempts remaining before account lock."
         )
 
     # Step 5: Inactive check
     if user.is_active:
         raise HTTPException(
-            status_code=403,
+            status_code=409,
             detail="Your account is inactive. Please contact support."
         )
 
