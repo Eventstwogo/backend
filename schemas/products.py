@@ -79,8 +79,8 @@ class ProductCreate(BaseModel):
 
 class ProductResponse(BaseModel):
     product_id: str
-    banner_image: Optional[str]
-    store_name: Optional[str]
+    # banner_image: Optional[str]
+    # store_name: Optional[str]
     slug: str
     identification: Dict[str, Any]
     descriptions: Optional[Dict[str, Any]]
@@ -181,4 +181,15 @@ class AllProductsListResponse(BaseModel):
     page: int
     per_page: int
     total_pages: int
+
+
+class VendorProductsResponse(BaseModel):
+    """Response model for products by vendor with vendor details"""
+    vendor_id: str
+    store_name: Optional[str]
+    banner_image: Optional[str]
+    banner_title: Optional[str]
+    banner_subtitle: Optional[str]
+    products: List[ProductResponse]
+    total_count: int
 

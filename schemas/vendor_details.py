@@ -72,11 +72,15 @@ class VendorProfilePictureUploadResponse(BaseModel):
 class VendorBannerUploadResponse(BaseModel):
     """Response schema for vendor banner image upload"""
     banner_image_url: str
+    banner_title: Optional[str] = None
+    banner_subtitle: Optional[str] = None
 
 
 class VendorBannerResponse(BaseModel):
     """Response schema for vendor banner image retrieval"""
     banner_image_url: Optional[str] = None
+    banner_title: Optional[str] = None
+    banner_subtitle: Optional[str] = None
 
 
 class VendorUserDetailResponse(BaseModel):

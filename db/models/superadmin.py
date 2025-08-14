@@ -328,6 +328,8 @@ class BusinessProfile(Base):
     )
     profile_details: Mapped[dict] = mapped_column(JSONB, nullable=False)
     business_logo: Mapped[str] = mapped_column(String, nullable=True)
+    banner_title: Mapped[str] = mapped_column(String, nullable=True)
+    banner_subtitle: Mapped[str] = mapped_column(String, nullable=True)
     payment_preference: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=True)
     store_name: Mapped[str] = mapped_column(String, nullable=True)
     store_slug: Mapped[str] = mapped_column(String, nullable=True, unique=True)

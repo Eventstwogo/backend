@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, status, Path, UploadFile, File
+from fastapi import APIRouter, Depends, status, Path, UploadFile, File, Form
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 
@@ -82,12 +83,22 @@ async def upload_vendor_profile_picture_by_id(
 async def upload_vendor_banner_image_by_id(
     user_id: str = Path(..., description="Vendor user ID to upload banner image for"),
     file: UploadFile = File(..., description="Banner image file to upload"),
+    banner_title: Optional[str] = Form(None, description="Optional banner title"),
+    banner_subtitle: Optional[str] = Form(None, description="Optional banner subtitle"),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """
     Upload banner image for a vendor business by user ID.
+    
+    Optionally accepts banner title and subtitle text that will be stored with the banner image.
     """
-    result = await upload_vendor_banner_image(db=db, user_id=user_id, file=file)
+    result = await upload_vendor_banner_image(
+        db=db, 
+        user_id=user_id, 
+        file=file, 
+        banner_title=banner_title, 
+        banner_subtitle=banner_subtitle
+    )
 
     if isinstance(result, JSONResponse):
         return result

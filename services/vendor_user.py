@@ -1,4 +1,5 @@
 
+from typing import Optional
 from fastapi import status, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -248,7 +249,9 @@ async def get_vendor_user_details(
 async def upload_vendor_banner_image(
     db: AsyncSession, 
     user_id: str, 
-    file: UploadFile
+    file: UploadFile,
+    banner_title: Optional[str] = None,
+    banner_subtitle: Optional[str] = None
 ) -> JSONResponse | VendorBannerUploadResponse:
     """
     Upload banner image for a vendor business by user ID.
@@ -299,15 +302,21 @@ async def upload_vendor_banner_image(
         upload_path = settings.VENDOR_BANNER_UPLOAD_PATH.format(business_id=business_profile.profile_ref_id)
         relative_path = await save_uploaded_file(file, upload_path)
         
-        # Update business_logo column in database
+        # Update business_logo column and banner title/subtitle in database
         business_profile.business_logo = relative_path
+        if banner_title is not None:
+            business_profile.banner_title = banner_title
+        if banner_subtitle is not None:
+            business_profile.banner_subtitle = banner_subtitle
         await db.commit()
         
         # Get the full URL for response
         banner_image_url = get_media_url(relative_path)
         
         return VendorBannerUploadResponse(
-            banner_image_url=banner_image_url
+            banner_image_url=banner_image_url,
+            banner_title=business_profile.banner_title,
+            banner_subtitle=business_profile.banner_subtitle
         )
         
     except Exception as e:
@@ -399,7 +408,9 @@ async def get_vendor_banner_image(
             banner_image_url = get_media_url(business_profile.business_logo)
         
         return VendorBannerResponse(
-            banner_image_url=banner_image_url
+            banner_image_url=banner_image_url,
+            banner_title=business_profile.banner_title,
+            banner_subtitle=business_profile.banner_subtitle
         )
         
     except Exception as e:

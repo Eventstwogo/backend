@@ -8,7 +8,7 @@ from utils.file_uploads import get_media_url, save_uploaded_file
 from utils.upload_files import upload_file_to_s3
 from sqlalchemy.orm import selectinload
 from utils.id_generators import generate_lowercase
-from schemas.products import ProductByCategoryListResponse, ProductByCategoryResponse, ProductResponse, ProductListResponse, ProductSearchListResponse, ProductSearchResponse
+from schemas.products import ProductByCategoryListResponse, ProductByCategoryResponse, ProductResponse, ProductListResponse, ProductSearchListResponse, ProductSearchResponse, VendorProductsResponse
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.status_codes import APIResponse, StatusCode
@@ -642,13 +642,29 @@ async def get_products_by_store_slug(
         )
 
 
-@router.get("/by-vendor-id/{vendor_id}", response_model=List[ProductResponse])
+@router.get("/by-vendor-id/{vendor_id}", response_model=VendorProductsResponse)
 async def get_products_by_vendor_id(
     vendor_id: str,
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        # Get products with business profile data using the vendor_id
+        # First, verify vendor exists and get vendor details
+        vendor_result = await db.execute(
+            select(VendorLogin, BusinessProfile)
+            .join(BusinessProfile, VendorLogin.business_profile_id == BusinessProfile.profile_ref_id)
+            .filter(VendorLogin.user_id == vendor_id)
+        )
+        vendor_data = vendor_result.first()
+        
+        if not vendor_data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Vendor with ID {vendor_id} not found"
+            )
+        
+        vendor_login, business_profile = vendor_data
+        
+        # Get products for this vendor
         result = await db.execute(
             select(Product, VendorLogin, BusinessProfile)
             .join(VendorLogin, Product.vendor_id == VendorLogin.user_id)
@@ -661,23 +677,19 @@ async def get_products_by_vendor_id(
         )
         products_data = result.all()
 
-        # if not products_data:
-        #     raise HTTPException(
-        #         status_code=404,
-        #         detail=f"No products found for vendor ID: {vendor_id}"
-        #     )
-
         # Map products into the correct response model
-        response = []
+        products_list = []
         for product, vendor_login, business_profile in products_data:
             image_urls = []
             if product.images and "urls" in product.images:
                 image_urls = [get_media_url(url) for url in product.images["urls"]]
 
-            response.append(
+            products_list.append(
                 ProductResponse(
                     product_id=product.product_id,
-                    banner_image=get_media_url(business_profile.business_logo) if business_profile else None,
+                    # banner_image=get_media_url(business_profile.business_logo) if business_profile else None,
+                    # banner_title=business_profile.banner_title if business_profile else None,
+                    # banner_subtitle=business_profile.banner_subtitle if business_profile else None,
                     store_name=business_profile.store_name if business_profile else None,
                     slug=product.slug,
                     identification=product.identification,
@@ -696,7 +708,16 @@ async def get_products_by_vendor_id(
                 )
             )
 
-        return response
+        # Return vendor details with products (empty list if no products)
+        return VendorProductsResponse(
+            vendor_id=vendor_id,
+            store_name=business_profile.store_name if business_profile else None,
+            banner_image=get_media_url(business_profile.business_logo) if business_profile and business_profile.business_logo else None,
+            banner_title=business_profile.banner_title if business_profile else None,
+            banner_subtitle=business_profile.banner_subtitle if business_profile else None,
+            products=products_list,
+            total_count=len(products_list)
+        )
 
     except HTTPException:
         # Re-raise HTTPException (like our 404) without modification
