@@ -1,24 +1,9 @@
 from fastapi import APIRouter
 
-from api.v1.endpoints import (
-    abn_check,
-    categories,
-    categories_by_id,
-    categories_by_slug,
-    categories_or_subcategories_by_id,
-    config,
-    roles,
-    sub_categories_by_id,
-    sub_categories_by_slug,
-    subcategories,
-    industries,
- 
-)
-
 
 from api.v1.endpoints.vendor import vendor_signup, email_verification, business_profile, vendor_login, vendor_onboarding, fetch_vendors, employee, password_manager as vendor_password_manager, queries, user_profile
-from api.v1.endpoints.admin import registration, admin_login, password_manager, product, vendor_approval, admin_users
-from api.v1.endpoints.vendor import vendor_category_mapping
+from api.v1.endpoints.admin import registration, admin_login, password_manager, product, vendor_approval, admin_users, categories,categories_by_id,categories_by_slug,categories_or_subcategories_by_id,config,roles,sub_categories_by_id,sub_categories_by_slug,subcategories,industries
+from api.v1.endpoints.vendor import vendor_category_mapping, abn_check
 from api.v1.endpoints.users import register, login, password_manager as user_password_manager, user_management
 from api.v1.endpoints.users import contactus
 
