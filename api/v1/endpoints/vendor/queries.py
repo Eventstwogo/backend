@@ -59,10 +59,10 @@ async def create_query(
             log_error=True,
         )
 
-    # Check for duplicate open query with same vendor, title, category, and message
+    # Check for duplicate open query with same vendor, title, category, and message (case-insensitive)
     existing_query_stmt = select(VendorQuery).where(
         VendorQuery.sender_user_id == request.user_id,
-        VendorQuery.title == request.title,
+        func.lower(VendorQuery.title) == func.lower(request.title),
         VendorQuery.category == request.category,
         VendorQuery.query_status == QueryStatus.QUERY_OPEN
     )
@@ -70,11 +70,11 @@ async def create_query(
     existing_result = await db.execute(existing_query_stmt)
     existing_queries = existing_result.scalars().all()
     
-    # Check if any existing open query has the same initial message
+    # Check if any existing open query has the same initial message (case-insensitive)
     for existing_query in existing_queries:
         if existing_query.thread and len(existing_query.thread) > 0:
             first_message = existing_query.thread[0].get("message", "")
-            if first_message == request.message:
+            if first_message.lower() == request.message.lower():
                 return api_response(
                     status.HTTP_409_CONFLICT,
                     "A query with the same title, category, and message already exists and is still open",

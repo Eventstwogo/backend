@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, status, Path, UploadFile, File, Form
+import re
+from fastapi import APIRouter, Depends, HTTPException, status, Path, UploadFile, File, Form
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
@@ -14,6 +15,39 @@ from services.vendor_user import (
     get_vendor_banner_image
 )
 from utils.exception_handlers import exception_handler
+
+TITLE_REGEX = re.compile(r'^[A-Za-z.! ]+$')   # Allow letters, spaces, dot, !
+SUBTITLE_REGEX = re.compile(r'^[A-Za-z.! ]+$')
+
+
+def validate_banner_fields(
+    title: Optional[str], 
+    subtitle: Optional[str]
+) -> tuple[Optional[str], Optional[str]]:
+    errors = []
+
+    # Validate title (if provided)
+    if title:
+        if not (5 <= len(title) <= 35):
+            errors.append("Banner title must be between 5 and 35 characters.")
+        elif not TITLE_REGEX.match(title):
+            errors.append("Banner title may only contain letters (A-Z, a-z), spaces, '.', and '!'.")
+    
+    # Validate subtitle (if provided)
+    if subtitle:
+        if not (5 <= len(subtitle) <= 80):
+            errors.append("Banner subtitle must be between 5 and 80 characters.")
+        elif not SUBTITLE_REGEX.match(subtitle):
+            errors.append("Banner subtitle may only contain letters (A-Z, a-z), spaces, '.', and '!'.")
+    
+    # If any validation failed, raise a combined error
+    if errors:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=" ".join(errors),
+        )
+
+    return title, subtitle
 
 router = APIRouter()
 
@@ -92,6 +126,10 @@ async def upload_vendor_banner_image_by_id(
     
     Optionally accepts banner title and subtitle text that will be stored with the banner image.
     """
+    
+    # Validate title and subtitle (both optional)
+    banner_title, banner_subtitle = validate_banner_fields(banner_title, banner_subtitle)
+
     result = await upload_vendor_banner_image(
         db=db, 
         user_id=user_id, 

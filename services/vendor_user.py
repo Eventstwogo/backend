@@ -11,6 +11,8 @@ from db.models.superadmin import Category, Config, VendorSignup, VendorLogin, Bu
 from schemas.vendor_details import VendorProfilePictureUploadResponse, VendorUserDetailResponse, VendorBannerUploadResponse, VendorBannerResponse
 from utils.file_uploads import get_media_url
 from utils.id_generators import decrypt_data
+from utils.file_uploads import save_uploaded_file, get_media_url, remove_file_if_exists
+from core.config import settings
 
 async def validate_unique_user(db: AsyncSession, email_hash: str):
     # First check if email exists in ven_signup table
@@ -256,8 +258,6 @@ async def upload_vendor_banner_image(
     """
     Upload banner image for a vendor business by user ID.
     """
-    from utils.file_uploads import save_uploaded_file, get_media_url, remove_file_if_exists
-    from core.config import settings
     
     # Get the vendor user
     user = await get_vendor_user_by_id(db, user_id)
