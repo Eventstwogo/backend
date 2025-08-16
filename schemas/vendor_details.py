@@ -14,8 +14,8 @@ class VendorDetailsResponse(BaseModel):
     store_name: Optional[str] = None
     store_slug: Optional[str] = None
     location: Optional[str] = None
-    business_logo: Optional[str] = None
-    store_logo: Optional[str] = None
+    banner_image: Optional[str] = None
+    # store_logo: Optional[str] = None
     categories: List[VendorCategoryInfo] = []
     total_products: int = 0
     years_in_business: str = "0:00"  # Format: yyyy:mm
