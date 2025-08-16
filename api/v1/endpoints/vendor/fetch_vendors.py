@@ -697,6 +697,7 @@ async def get_vendor_products_and_categories(
         vendor_id=vendor.user_id,
         store_name=store_name,
         store_slug=store_slug_response,
+        banner_image=get_media_url(business_profile.business_logo) if business_profile else None,
         products=products_info,
         total_products=len(products_info),
         category_management=category_management_info

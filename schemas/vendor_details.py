@@ -58,6 +58,7 @@ class VendorProductsAndCategoriesResponse(BaseModel):
     vendor_id: str
     store_name: Optional[str] = None
     store_slug: Optional[str] = None
+    banner_image: Optional[str] = None
     products: List[VendorProductInfo] = []
     total_products: int = 0
     category_management: List[VendorCategoryManagementInfo] = []
