@@ -1,6 +1,10 @@
+import csv
 from datetime import datetime
+import io
 import json
+import os
 from typing import Dict, List, Optional
+import aiofiles
 from psycopg2 import IntegrityError
 from slugify import slugify
 
@@ -48,6 +52,313 @@ async def generate_unique_slug(product_name: str, db: AsyncSession, current_prod
 
 
 router = APIRouter()
+
+
+
+@router.post("/bulk-upload-products/")
+async def bulk_upload_products(
+    file: UploadFile = File(...),
+    vendor_id: str = Form(...),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        # Validate vendor
+        result = await db.execute(
+            select(VendorLogin)
+            .options(selectinload(VendorLogin.business_profile))
+            .filter(VendorLogin.user_id == vendor_id)
+        )
+        vendor_check = result.scalars().first()
+        if not vendor_check or vendor_check.username != "unknown":
+            return APIResponse.response(StatusCode.NOT_FOUND, "Vendor not found", log_error=True)
+
+        # Read CSV
+        content = await file.read()
+        csv_reader = csv.DictReader(io.StringIO(content.decode("utf-8")))
+
+        products_to_create = []
+        failed_rows = []
+        row_num = 1
+
+        async for row in _iterate_csv(csv_reader):
+            try:
+                # Product basic info
+                product_name = row.get("product_name", "").strip()
+                if not product_name:
+                    raise ValueError("Product name is required")
+
+                category_name = row.get("category_name", "").strip()
+                subcategory_name = row.get("subcategory_name", "").strip()  # optional
+
+                # Resolve category_id
+                result = await db.execute(select(Category).filter(Category.category_name == category_name))
+                category = result.scalars().first()
+                if not category:
+                    raise ValueError(f"Category '{category_name}' not found")
+                cat_id = category.category_id
+
+                # Resolve subcategory_id (if provided)
+                subcat_id = None
+                if subcategory_name:
+                    result = await db.execute(
+                        select(SubCategory).filter(
+                            SubCategory.subcategory_name == subcategory_name,
+                            SubCategory.category_id == cat_id
+                        )
+                    )
+                    subcategory = result.scalars().first()
+                    if not subcategory:
+                        raise ValueError(f"Subcategory '{subcategory_name}' not valid for category '{category_name}'")
+                    subcat_id = subcategory.subcategory_id
+
+                # Generate slug
+                base_slug = slugify(product_name)
+                slug = base_slug
+                suffix = 0
+                while True:
+                    res = await db.execute(select(Product).filter(Product.slug == slug))
+                    if not res.scalars().first():
+                        break
+                    suffix += 1
+                    slug = f"{base_slug}-{suffix}"
+
+                # Generate product_id
+                product_id = generate_lowercase(6)
+
+                # Handle images
+                images = [img.strip() for img in row.get("images", "").split("|") if img.strip()]
+                image_urls = []
+                for img_path in images:
+                    async with aiofiles.open(img_path, 'rb') as f:
+                        file_bytes = await f.read()
+                        filename = os.path.basename(img_path)
+                        url = await upload_file_to_s3(file_bytes, file_path=f"products/{filename}")
+                        image_urls.append(url)
+
+                # Build product
+                db_product = Product(
+                    product_id=product_id,
+                    vendor_id=vendor_id,
+                    category_id=cat_id,
+                    subcategory_id=subcat_id,
+                    slug=slug,
+                    identification={
+                        "product_name": product_name,
+                        "product_sku": row.get("product_sku", "").strip()
+                    },
+                    descriptions={
+                        "short_description": row.get("short_description", "").strip(),
+                        "full_description": row.get("full_description", "").strip()
+                    },
+                    pricing={
+                        "actual_price": row.get("actual_price", "").strip(),
+                        "selling_price": row.get("selling_price", "").strip()
+                    },
+                    inventory={
+                        "quantity": row.get("stock_quantity", "").strip(),
+                        "stock_alert_status": row.get("stock_alert_status", "instock").strip()
+                    },
+                    physical_attributes={
+                        "weight": row.get("weight", "").strip(),
+                        "dimensions": row.get("dimensions", "{}").strip(),
+                        "shipping_class": row.get("shipping_class", "standard").strip()
+                    },
+                    images={"urls": image_urls},
+                    tags_and_relationships={
+                        "product_tags": [t.strip() for t in row.get("product_tags", "").split("|") if t.strip()],
+                        "linkedproductid": row.get("linkedproductid", "").strip()
+                    },
+                    status_flags={
+                        "featured_product": row.get("featured_product", "false").lower() == "true",
+                        "published_product": row.get("published_product", "true").lower() == "true",
+                        "product_status": row.get("product_status", "false").lower() == "true"
+                    }
+                )
+
+                products_to_create.append(db_product)
+
+            except Exception as e:
+                failed_rows.append({"row": row_num, "error": str(e), "data": row})
+
+            row_num += 1
+
+        # Bulk insert
+        if products_to_create:
+            db.add_all(products_to_create)
+            await db.commit()
+
+        return {
+            "success_count": len(products_to_create),
+            "failed_count": len(failed_rows),
+            "failed_rows": failed_rows
+        }
+
+    except IntegrityError as e:
+        await db.rollback()
+        return APIResponse.response(StatusCode.BAD_REQUEST, f"Integrity error: {str(e)}", log_error=True)
+    except Exception as e:
+        await db.rollback()
+        return APIResponse.response(StatusCode.SERVER_ERROR, f"Unexpected error: {str(e)}", log_error=True)
+
+
+async def _iterate_csv(reader):
+    """Helper to simulate async loop over CSV"""
+    for row in reader:
+        yield row
+
+
+
+# @router.post("/bulk-upload-products/")
+# async def bulk_upload_products(
+#     file: UploadFile = File(...),
+#     vendor_id: str = Form(...),
+#     db: AsyncSession = Depends(get_db)
+# ):
+#     try:
+#         # Validate vendor
+#         result = await db.execute(
+#             select(VendorLogin)
+#             .options(selectinload(VendorLogin.business_profile))
+#             .filter(VendorLogin.user_id == vendor_id)
+#         )
+#         vendor_check = result.scalars().first()
+#         if not vendor_check or vendor_check.username != "unknown":
+#             return APIResponse.response(StatusCode.NOT_FOUND, "Vendor not found", log_error=True)
+
+#         # Read CSV
+#         content = await file.read()
+#         csv_reader = csv.DictReader(io.StringIO(content.decode("utf-8")))
+
+#         products_to_create = []
+#         failed_rows = []
+#         row_num = 1
+
+#         async for row in _iterate_csv(csv_reader):  # custom async loop helper
+#             try:
+#                 product_name = row.get("product_name", "").strip()
+#                 if not product_name:
+#                     raise ValueError("Product name is required")
+
+#                 cat_id = row.get("category_id")
+#                 subcat_id = row.get("subcategory_id")
+
+#                 # Validate category
+#                 result = await db.execute(select(Category).filter(Category.category_id == cat_id))
+#                 category = result.scalars().first()
+#                 if not category:
+#                     raise ValueError(f"Category {cat_id} not found")
+
+#                 # Validate subcategory
+#                 subcategory = None
+#                 if subcat_id:
+#                     result = await db.execute(
+#                         select(SubCategory).filter(
+#                             SubCategory.subcategory_id == subcat_id,
+#                             SubCategory.category_id == cat_id
+#                         )
+#                     )
+#                     subcategory = result.scalars().first()
+#                     if not subcategory:
+#                         raise ValueError(f"Subcategory {subcat_id} not valid for category {cat_id}")
+
+#                 # Generate slug
+#                 base_slug = slugify(product_name)
+#                 slug = base_slug
+#                 suffix = 0
+#                 while True:
+#                     res = await db.execute(select(Product).filter(Product.slug == slug))
+#                     if not res.scalars().first():
+#                         break
+#                     suffix += 1
+#                     slug = f"{base_slug}-{suffix}"
+
+#                 # Generate product_id
+#                 product_id = generate_lowercase(6)
+
+#                 images = row.get("images", "").split("|")  # assuming multiple images separated by "|"
+#                 image_urls = []
+
+#                 for img_path in images:
+#                     img_path = img_path.strip()  # remove leading/trailing spaces and newlines
+#                     if not img_path:
+#                         continue  # skip empty paths
+
+#                     async with aiofiles.open(img_path, 'rb') as f:
+#                         upload_file = UploadFile(filename=os.path.basename(img_path), file=f)
+#                         url = await upload_file_to_s3(await f.read(), file_path=f"products/{os.path.basename(img_path)}")
+#                         image_urls.append(url)
+
+
+#                 # Build product
+#                 db_product = Product(
+#                     product_id=product_id,
+#                     vendor_id=vendor_id,
+#                     category_id=cat_id,
+#                     subcategory_id=subcat_id if subcat_id else None,
+#                     slug=slug,
+#                     identification={
+#                         "product_name": product_name,
+#                         "product_sku": row.get("product_sku", "")
+#                     },
+#                     descriptions={
+#                         "short_description": row.get("short_description", ""),
+#                         "full_description": row.get("full_description", "")
+#                     },
+#                     pricing={
+#                         "actual_price": row.get("actual_price", ""),
+#                         "selling_price": row.get("selling_price", "")
+#                     },
+#                     inventory={
+#                         "quantity": row.get("stock_quantity", ""),
+#                         "stock_alert_status": row.get("stock_alert_status", "instock")
+#                     },
+#                     physical_attributes={
+#                         "weight": row.get("weight", ""),
+#                         "dimensions": row.get("dimensions", "{}"),
+#                         "shipping_class": row.get("shipping_class", "standard")
+#                     },
+#                     images={"urls": image_urls},
+#                     tags_and_relationships={
+#                         "product_tags": row.get("product_tags", "").split("|"),
+#                         "linkedproductid": row.get("linkedproductid", "")
+#                     },
+#                     status_flags={
+#                         "featured_product": row.get("featured_product", "false").lower() == "true",
+#                         "published_product": row.get("published_product", "true").lower() == "true",
+#                         "product_status": row.get("product_status", "false").lower() == "true"
+#                     }
+#                 )
+
+#                 products_to_create.append(db_product)
+
+#             except Exception as e:
+#                 failed_rows.append({"row": row_num, "error": str(e), "data": row})
+
+#             row_num += 1
+
+#         # Bulk insert
+#         if products_to_create:
+#             db.add_all(products_to_create)
+#             await db.commit()
+
+#         return {
+#             "success_count": len(products_to_create),
+#             "failed_count": len(failed_rows),
+#             "failed_rows": failed_rows
+#         }
+
+#     except IntegrityError as e:
+#         await db.rollback()
+#         return APIResponse.response(StatusCode.BAD_REQUEST, f"Integrity error: {str(e)}", log_error=True)
+#     except Exception as e:
+#         await db.rollback()
+#         return APIResponse.response(StatusCode.SERVER_ERROR, f"Unexpected error: {str(e)}", log_error=True)
+
+
+# async def _iterate_csv(reader):
+#     """Helper to simulate async loop over CSV"""
+#     for row in reader:
+#         yield row
 
 
 @router.post("/create-product/", response_model=ProductResponse, status_code=201)

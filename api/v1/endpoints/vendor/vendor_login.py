@@ -32,12 +32,6 @@ async def login_user(
     signup_result = await db.execute(signup_stmt)
     signup_user = signup_result.scalar_one_or_none()
 
-    # if signup_user and not signup_user.email_flag:
-    #     raise HTTPException(
-    #         status_code=401,
-    #         detail="Please verify your email address before logging in."
-    #     )
-
     # Step 2: VendorLogin lookup
     stmt = select(VendorLogin).where(VendorLogin.email_hash == email_hash)
     result = await db.execute(stmt)
@@ -50,11 +44,11 @@ async def login_user(
                     status_code=401,
                     detail="Please verify your email first before logging in."
                 )
-            # else:
-            #     raise HTTPException(
-            #         status_code=422,
-            #         detail="Account verification incomplete. Please contact support."
-                # )
+            else:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Account verification pending"
+                )
         else:
             raise HTTPException(
                 status_code=404,
@@ -148,15 +142,6 @@ async def login_user(
         onboarding_status=onboarding_status,
         reviewer_comment= reviewer_comment
     )
-
-    # # Decrypt email and username for token
-    # try:
-    #     decrypted_email = decrypt_data(user.email)
-    #     decrypted_username = decrypt_data(user.username) if user.username != "unknown" else "unknown"
-    # except Exception:
-    #     # Fallback to encrypted values if decryption fails
-    #     decrypted_email = user.email
-    #     decrypted_username = user.username if user.username != "unknown" else "unknown"
 
     token_data = {
         "uid": user.user_id,
