@@ -374,6 +374,7 @@ async def get_vendor_details(
         },
         "business_profile": {
             "store_name": business_profile.store_name,
+            "banner_image": get_media_url(business_profile.business_logo),
             "industry": business_profile.industry,
             "location": business_profile.location,
             "is_approved": business_profile.is_approved,
