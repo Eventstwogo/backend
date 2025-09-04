@@ -1502,6 +1502,9 @@ async def get_products_by_category_or_subcategory_slug(
             short_description = product.descriptions.get("short_description", "") if product.descriptions else None
             selling_price = product.pricing.get("selling_price", "") if product.pricing else None
             actual_price = product.pricing.get("actual_price", "") if product.pricing else None
+
+            stock = product.inventory.get("quantity", "") if product.inventory else None
+            stock_alert_status = product.inventory.get("stock_alert_status", "") if product.inventory else None
             
             # Extract status flags
             featured_product = product.status_flags.get("featured_product", False) if product.status_flags else False
@@ -1512,6 +1515,8 @@ async def get_products_by_category_or_subcategory_slug(
                 product_id=product.product_id,
                 product_name=product_name,
                 product_sku=product_sku,
+                stock = stock,
+                stock_alert_status= stock_alert_status,
                 slug=product.slug,
                 short_description=short_description,
                 selling_price=selling_price,

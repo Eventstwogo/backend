@@ -565,3 +565,52 @@ class VendorQuery(Base):
         default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc),
     )
+
+
+
+class Partners(Base):
+    __tablename__ = "ss_partners"
+
+    partner_id: Mapped[str] = mapped_column(
+        String(6), primary_key=True, unique=True, nullable=False
+    )
+    logo: Mapped[str] = mapped_column(String(255), nullable=False)
+    website_url: Mapped[str] = mapped_column(String(255), nullable=False)
+    partner_status: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+
+class Advertisement(Base):
+    __tablename__ = "ss_advertisement"
+
+    ad_id: Mapped[str] = mapped_column(
+        String(6), primary_key=True, unique=True, nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    banner: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_url: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )
+    ad_status: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

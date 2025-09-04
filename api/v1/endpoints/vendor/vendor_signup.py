@@ -1,9 +1,12 @@
 
 from datetime import datetime
+from sqlalchemy import select
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
+    HTTPException,
+    Query,
     status,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +30,7 @@ from utils.email_utils import send_vendor_verification_email
 from utils.file_uploads import (
     get_media_url,
 )
-from utils.id_generators import encrypt_data, generate_lower_uppercase, hash_data, random_token
+from utils.id_generators import decrypt_data, encrypt_data, generate_lower_uppercase, hash_data, random_token
 
 router = APIRouter()
 
@@ -102,4 +105,41 @@ async def register_user(
             email=user_data.email,
            
         ),
+    )
+
+
+@router.get(
+    "/vendors",
+    response_model=list[VendorRegisterResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_all_vendors(
+    db: AsyncSession = Depends(get_db),
+    
+) -> JSONResponse:
+    # Fetch vendors with pagination
+    result = await db.execute(
+        select(VendorSignup)
+    )
+    vendors = result.scalars().all()
+
+    if not vendors:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No vendors found",
+        )
+
+    # Prepare response with decrypted emails
+    vendor_list = [
+        VendorRegisterResponse(
+            signup_id=v.signup_id,
+            email=decrypt_data(v.email),
+        )
+        for v in vendors
+    ]
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Vendors retrieved successfully",
+        data=vendor_list,
     )

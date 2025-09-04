@@ -129,6 +129,8 @@ class ProductByCategoryResponse(BaseModel):
     timestamp: Optional[datetime]
     category_name: str
     subcategory_name: Optional[str]
+    stock: Optional[str]
+    stock_alert_status: Optional[str]
     store_name: Optional[str]
 
 
