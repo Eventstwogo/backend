@@ -113,7 +113,17 @@ class VendorRegisterResponse(BaseModel):
     signup_id: str
     email: EmailStr
     
+class VendorLoginResponse(BaseModel):
+    user_id: str
+    username: str
+    email: str
+    is_verified: int
+    role: Optional[str]
+    is_active: bool
+    last_login: Optional[datetime]
 
+    class Config:
+        orm_mode = True
 
 class VendorUser(BaseModel):
     user_id: str

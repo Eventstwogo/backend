@@ -16,10 +16,11 @@ from urllib.parse import quote
 
 from core.api_response import api_response
 from core.config import settings
-from db.models.superadmin import Config
+from db.models.superadmin import Config, VendorLogin
 from db.models.superadmin import VendorSignup
 from db.sessions.database import get_db
 from schemas.register import (
+    VendorLoginResponse,
     VendorRegisterRequest,
     VendorRegisterResponse,
 )
@@ -142,4 +143,48 @@ async def get_all_vendors(
         status_code=status.HTTP_200_OK,
         message="Vendors retrieved successfully",
         data=vendor_list,
+    )
+
+
+
+
+@router.get(
+    "/vendor-logins",
+    response_model=list[VendorLoginResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_all_vendor_logins(
+    db: AsyncSession = Depends(get_db),
+   
+) -> JSONResponse:
+    # Fetch logins with pagination
+    result = await db.execute(
+        select(VendorLogin)
+    )
+    logins = result.scalars().all()
+
+    if not logins:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No vendor logins found",
+        )
+
+    # Prepare safe response
+    login_list = [
+        VendorLoginResponse(
+            user_id=l.user_id,
+            username=l.username,
+            email=decrypt_data(l.email),   # decrypt email if encrypted
+            is_verified=l.is_verified,
+            role=l.role,
+            is_active=l.is_active,
+            last_login=l.last_login,
+        )
+        for l in logins
+    ]
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Vendor logins retrieved successfully",
+        data=login_list,
     )
