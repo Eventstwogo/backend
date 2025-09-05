@@ -450,9 +450,17 @@ async def get_vendor_details(
 
 @router.get("/vendors/all", response_model=list[dict])
 async def get_all_vendors(db: AsyncSession = Depends(get_db)):
-    stmt = select(VendorLogin).options(
-        joinedload(VendorLogin.business_profile).joinedload(BusinessProfile.industry_obj)
-    ).where(VendorLogin.username == "unknown")
+    stmt = (
+        select(VendorLogin)
+        .options(
+            joinedload(VendorLogin.business_profile).joinedload(BusinessProfile.industry_obj)
+        )
+        .join(VendorLogin.business_profile)  # ensure filtering across relationship
+        .where(
+            VendorLogin.is_verified == 1,
+            BusinessProfile.is_approved == 2
+        )
+    )
     result = await db.execute(stmt)
     vendors = result.scalars().all()
 

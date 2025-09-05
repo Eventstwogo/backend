@@ -3,14 +3,14 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from slugify import slugify
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 
 from utils.file_uploads import get_media_url
 from core.api_response import api_response
 from core.status_codes import APIResponse, StatusCode
-from db.models.superadmin import Category, Industries, VendorLogin  
+from db.models.superadmin import Category, Industries, SubCategory, VendorLogin  
 from db.sessions.database import get_db
 from schemas.industry import CreateIndustry, IndustryDetails, IndustryUpdate
 from utils.exception_handlers import exception_handler
@@ -477,5 +477,73 @@ async def get_categories_by_vendor(
     return api_response(
         status_code=status.HTTP_200_OK,
         message="Categories and subcategories fetched successfully by vendor",
+        data=data,
+    )
+
+
+@router.get("/industries/full", summary="Get active industries with categories and subcategories")
+@exception_handler
+async def get_all_industries_with_categories_and_subcategories(
+    db: AsyncSession = Depends(get_db),
+):
+    # Join industries → categories → subcategories with filters
+    stmt = (
+        select(Industries, Category, SubCategory)
+        .join(Category, Category.industry_id == Industries.industry_id, isouter=True)
+        .join(SubCategory, SubCategory.category_id == Category.category_id, isouter=True)
+        .where(
+            Industries.is_active == False,           # only active industries
+            or_(Category.category_status == False, Category.category_status.is_(None)),  # active categories
+            or_(SubCategory.subcategory_status == False, SubCategory.subcategory_status.is_(None))  # active subcategories
+        )
+    )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    if not rows:
+        return api_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="No active industries found.",
+            log_error=True,
+        )
+
+    # Build nested structure manually
+    industries_dict: dict[str, dict] = {}
+
+    for industry, category, subcategory in rows:
+        if industry.industry_id not in industries_dict:
+            industries_dict[industry.industry_id] = {
+                "industry_id": industry.industry_id,
+                "industry_name": industry.industry_name,
+                "industry_slug": industry.industry_slug,
+                "categories": {},
+            }
+
+        if category and category.category_status == False:  # active category
+            if category.category_id not in industries_dict[industry.industry_id]["categories"]:
+                industries_dict[industry.industry_id]["categories"][category.category_id] = {
+                    "category_id": category.category_id,
+                    "category_name": category.category_name,
+                    "category_slug": category.category_slug,
+                    "subcategories": [],
+                }
+
+            if subcategory and subcategory.subcategory_status == False:  # active subcategory
+                industries_dict[industry.industry_id]["categories"][category.category_id]["subcategories"].append({
+                    "subcategory_id": subcategory.subcategory_id,
+                    "subcategory_name": subcategory.subcategory_name,
+                    "subcategory_slug": subcategory.subcategory_slug,
+                })
+
+    # Convert categories dict back to list
+    data = []
+    for industry in industries_dict.values():
+        industry["categories"] = list(industry["categories"].values())
+        data.append(industry)
+
+    return api_response(
+        status_code=status.HTTP_200_OK,
+        message="Active industries with categories and subcategories retrieved successfully.",
         data=data,
     )
